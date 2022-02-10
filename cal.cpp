@@ -206,6 +206,37 @@ const	char*	sy_daynam[]={"Sunday","Monday","Tuesday","Wednesday","Thursday",
 
 static	const char	*sy_dayprt[]={"AM","PM"};
 
+static int month(const char *m)
+{
+while (m[0]==' ') m++;
+int i, j, e;
+for (e=0; m[e]; e++) if (m[e]<=' ') break;
+if (e<3) return(0);
+//printf("[%s] e=%d\r\n",m,e);
+for (i=0;i<12;i++)
+	{
+	const char *mn=sy_mthnam[i];
+	for (j=0;j<e && mn[j]!=0;j++) if (TOUPPER(m[j]) != TOUPPER(mn[j])) break;
+//printf("i=%d j=%d\r\n",i,j);
+	if (j==e) return(i+1);
+	}
+return(0);
+}
+
+short cal_parse(const char *p)
+{
+if (!ISDIGIT(p[0])) return(0);
+int i, m, y, d=a2i(p,0);
+while (ISDIGIT(p[0])) p++;
+while (p[0]==' ') p++;
+m=month(p);
+if (!m) return(0);
+while (p[0]!=' ') p++;	// step over "month" (full mthname, or 1st 3 chars)
+while (p[0]==' ') p++;	// ...and spaces before "year"
+y=a2i(p,0);
+long dttm=caljoin(y,m,d,0,0,0);
+return(short_bd(dttm));
+}
 
 static int  calwkday(long cal)
 {

@@ -25,6 +25,9 @@
 #define	long_date(bd)	((long)(bd)*ONE_DAY)
 #define	short_hm(dttm)	((short)(((dttm)%ONE_DAY)/60))
 
+char	*dmy_stri(short bd);
+short cal_parse(const char *p);	// Parse emdb date string
+
 struct _TMR
 	{
 	long	secs;

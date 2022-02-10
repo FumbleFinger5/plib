@@ -4,11 +4,11 @@
 
 
 char	*strancpy(char *dst, const char *src, int bufsz);
-char    *stradup(const char *s);
-int     stridxc(char c,const char *s);
-int     strinspn(const char *sub, const char *str);
-char    *strfmt(char *str ,const char *fmt,...);
-char    *_strfmt(char*s1 ,const char*s2,va_list va);
+char  *stradup(const char *s);
+int   stridxc(char c,const char *s);
+int   strinspn(const char *sub, const char *str);
+char  *strfmt(char *str ,const char *fmt,...);
+char  *_strfmt(char*s1 ,const char*s2,va_list va);
 char	*_strfmt(char *str,const char *fmt,va_list);
 void	strendfmt(char *str, const char *fmt,...);
 char	*_strnfmt(char*,int, const char*, va_list);
@@ -16,14 +16,14 @@ char	*strend(const char *str);
 char	*strdel(char *str, int ct);				// delete 'ct' chars from front of 'str'
 char	*strfill(char *str, int ct, int chr);	// (sets str[ct]=0)
 char	*strins(char *str, const char *ins);	// add 'ins' to front of 'str'
-char	*strinsc(char *str, int ins);			// add char 'ins' to front of 'str'
+char	*strinsc(char *str, int ins);				// add char 'ins' to front of 'str'
 int 	stridxc(char,const char*);
-int	    stridxs(const char *substr, const char *str);	/* substr offset in str, or NOTFND */
+int	stridxs(const char *substr, const char *str);	/* substr offset in str, or NOTFND */
 int 	strinspn(const char *any_of_these, const char *in_this_string);
 char	*strjust(char* str, int width, int type, int fillchr);
 char	*strnfmt(char*, int len, const char*,...);
 char	*strrjust(char* str, int width);
-int	    strtoken(char*,char*,char*);
+int	strtoken(char*,char*,char*);
 char	*strtrim(char*);
 
 char *vb_field(const char *rec, int n);
