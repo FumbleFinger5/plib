@@ -65,7 +65,6 @@ int CSV_READER::parse_first_csv_line(void)
 		if (!stricmp(s, "File size"))
 			csv_filesz_fldno = i;
 		}
-//printf("add=%d see=%d\r\n",csv_added_fldno,csv_seen_fldno);
 	if (csv_title_fldno == NOTFND || csv_year_fldno == NOTFND || csv_emdb_num_fldno == NOTFND || csv_imdb_num_fldno == NOTFND || csv_rating_fldno == NOTFND)
 		return (NOTFND);
 	return (0); // no error
@@ -146,9 +145,8 @@ static int csv_filesz(char *buf, int fldno)
 }
 
 #include <ctype.h>
-//static const char *xlt = "áaÁAåaöoóoéeôoçcñnïiÀAüuÉEíiÖOëeàaèeýy'äaúuûu";
-#define XLT "áÁåöóéôçñïÀüÉíÖëàèýäúû"
-static const char *xlt2 = "aAaooeocniAuEiOeaey'auu";
+//#define XLT "áÁåöóéôçñïÀüÉíÖëàèýäúû"
+//static const char *xlt2 = "aAaooeocniAuEiOeaey'auu";
 
 static void force_ansi(char *s)
 {
@@ -211,7 +209,7 @@ int CSV_READER::str2EM_KEY(EM_KEY1 *e)
 	e->e.rating = a2i(w, 0);
 force_ansi(e->e.nam);
 force_ansi(e->director);
-if (e->seen==1) e->seen=e->added;
+if (e->seen==0 && e->e.rating!=0) e->seen=e->added;	// Assume watched when added to library, if undated rating
 	return (NO); // No error
 }
 
