@@ -145,8 +145,6 @@ static int csv_filesz(char *buf, int fldno)
 }
 
 #include <ctype.h>
-//#define XLT "áÁåöóéôçñïÀüÉíÖëàèýäúû"
-//static const char *xlt2 = "aAaooeocniAuEiOeaey'auu";
 
 static void force_ansi(char *s)
 {
