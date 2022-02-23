@@ -1,5 +1,5 @@
 struct	EM_KEY {char nam[60]; short year, emdb_num; int32_t imdb_num; char rating;}; // Each BTR entry includes RHDL (maybe NULL) to 'mct' MEDIA entries
-struct	EM_KEY1 {EM_KEY e; char director[30]; short added, seen, filesz;};
+struct	EM_KEY1 {EM_KEY e; char director[30], cast[60]; short added, seen, filesz;};
 
 #pragma pack(push, 1)
 struct	EM_MEDIA {char locn, fct, dct, dvd; __int64 sz;};		// The (variable length) array of media locations is in no particular sequence!!!
