@@ -5,7 +5,8 @@
 
 char	*strancpy(char *dst, const char *src, int bufsz);
 char  *stradup(const char *s);
-int   stridxc(char c,const char *s);
+int   stridxc(char c,const char *s);	// Offset of LEFTMOST (if any) instance of 'c' in 's'
+int   strridxc(char c,const char *s);	// Offset of RIGHTMOST (if any) instance of 'c' in 's'
 int   strinspn(const char *sub, const char *str);
 char  *strfmt(char *str ,const char *fmt,...);
 char  *_strfmt(char*s1 ,const char*s2,va_list va);

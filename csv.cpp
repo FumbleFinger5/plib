@@ -27,7 +27,7 @@ CSV_READER::CSV_READER(const char *fn)
 {
 	csv_title_fldno = csv_year_fldno = csv_emdb_num_fldno = NOTFND;
 	csv_imdb_num_fldno = csv_rating_fldno = csv_director_fldno = NOTFND;
-	csv_added_fldno = csv_seen_fldno = csv_filesz_fldno = NOTFND;
+	csv_added_fldno = csv_seen_fldno = csv_filesz_fldno = csv_cast_fldno = NOTFND;
 	f = flopen(fn, "R");
 	if (!f)
 	{
@@ -64,6 +64,8 @@ int CSV_READER::parse_first_csv_line(void)
 			csv_seen_fldno = i;
 		if (!stricmp(s, "File size"))
 			csv_filesz_fldno = i;
+		if (!stricmp(s, "Cast"))
+			csv_cast_fldno = i;
 		}
 	if (csv_title_fldno == NOTFND || csv_year_fldno == NOTFND || csv_emdb_num_fldno == NOTFND || csv_imdb_num_fldno == NOTFND || csv_rating_fldno == NOTFND)
 		return (NOTFND);
@@ -153,16 +155,18 @@ for (i=0; s[i]; i++)
 	{
 	switch (s[i])
 		{
+		case -59: case -63: case -64: case -65: s[i]='A'; break;
 		case -27: case -28: case -32: case -31: s[i]='a'; break;
-		case -19: case -17: s[i]='i'; break;
-		case -63: case -64: case -65: s[i]='A'; break;
-		case -12: case -13: case -10: s[i]='o'; break;
-		case -21: case -24: case -23: s[i]='e'; break;
+		case -33: s[i]='b'; break;
 		case -25: s[i]='c'; break;
-		case -15: s[i]='n'; break;
-		case -6: case -5: case -4: s[i]='u'; break;
 		case -55: s[i]='E'; break;
-		case -42: s[i]='O'; break;
+		case -21: case -24: case -23: case -26: s[i]='e'; break;
+		case -20: case -19: case -18: case -17: s[i]='i'; break;
+		case -15: s[i]='n'; break;
+		case -44: case -42: s[i]='O'; break;
+		case -30: case -8:  case -12: case -13: case -10: case -16: s[i]='o'; break;
+		case -36: s[i]='U'; break;
+		case -7:  case -6:  case -5:  case -4:  s[i]='u'; break;
 		case -3: s[i]='y'; break;
 		case -110: s[i]=39; break;
 		}
@@ -171,25 +175,32 @@ for (i=0; s[i]; i++)
 	}
 }
 
+static char *complete_names_only(char *w,int sz)
+{
+int i;
+while ((i = strlen(strtrim(w))) >= sz)
+	{
+	int c=strridxc(COMMA,w);
+	if (c==NOTFND) c=i-1;	// If no comma, remove just LAST ONE char from right-hand
+	w[c] = 0;					// If there WAS a comma (multiple names) delete all of rightmost name
+	}
+return(w);	// Complete names only - as many as will fit into 'sz' buffer with EOS nullbyte
+}
+
 int CSV_READER::str2EM_KEY(EM_KEY1 *e)
 {
-	char w[100];
+	char w[200];
 	int i, len;
 	memset(e, 0, sizeof(EM_KEY));
 	e->e.emdb_num = a2i(vb_field(buf, csv_emdb_num_fldno), 0);
 	e->e.imdb_num = a2l(vb_field(buf, csv_imdb_num_fldno), 0);
 	strtrim(strcpy(w, vb_field(buf, csv_title_fldno)));
-	if ((len = strlen(w)) >= 60)
-		return (3); // ERROR! - Only allowed 60 chars (incl terminating \0) for name (without year)
+//	if ((len = strlen(w)) >= 60)
+//		return (3); // ERROR! - Only allowed 60 chars (incl terminating \0) for name (without year)
 	e->e.year = a2i(vb_field(buf, csv_year_fldno), 0);
 	strcpy(e->e.nam, w);
 	if (csv_director_fldno != NOTFND)
-		{
-		strtrim(strcpy(w, vb_field(buf, csv_director_fldno)));
-		while ((i = strlen(w)) >= 30)
-			w[i - 1] = 0;
-		strcpy(e->director, w);
-		}
+		strcpy(e->director, complete_names_only(strcpy(w, vb_field(buf, csv_director_fldno)),30));
 	if (csv_added_fldno != NOTFND)
 		{
 		e->added = csv_date(buf, csv_added_fldno, filedate);
@@ -205,9 +216,16 @@ int CSV_READER::str2EM_KEY(EM_KEY1 *e)
 	if (i != NOTFND)
 		strdel(&w[i], 1);
 	e->e.rating = a2i(w, 0);
+	if (csv_cast_fldno != NOTFND)
+		{
+		char *cc=vb_field(buf, csv_cast_fldno);
+		if (cc==0) e->cast[0]=0; else
+		strcpy(e->cast, complete_names_only(strcpy(w, cc),60));
+		}
 force_ansi(e->e.nam);
 force_ansi(e->director);
-if (e->seen==0 && e->e.rating!=0) e->seen=e->added;	// Assume watched when added to library, if undated rating
+force_ansi(e->cast);
+if (e->seen<=1 && e->e.rating!=0) e->seen=e->added;	// Assume watched when added to library, if undated rating
 	return (NO); // No error
 }
 

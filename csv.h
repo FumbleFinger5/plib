@@ -12,7 +12,7 @@ char  buf[500];
 HDL 	f;
 int	csv_title_fldno, csv_year_fldno, csv_emdb_num_fldno,
 		csv_imdb_num_fldno, csv_rating_fldno, csv_director_fldno,
-		csv_added_fldno, csv_seen_fldno, csv_filesz_fldno;
+		csv_added_fldno, csv_seen_fldno, csv_filesz_fldno, csv_cast_fldno;
 int	again, filedate;
 };
 

@@ -330,6 +330,12 @@ const char *p=strchr(s,c);
 return(p?p-s:NOTFND);
 }
 
+int strridxc(char c,const char *s)	// Offset of RIGHTMOST (if any) instance of 'c' in 's'
+{
+const char *p=strrchr(s,c);
+return(p?p-s:NOTFND);
+}
+
 char *strend(const char *s)
 {
 return (char *)&s[strlen(s)];
@@ -460,7 +466,7 @@ return(p);
 // Return pointer to null-terminated static copy of \t-delimited field 'n' within VB text-format record structure 'rec'
 char *vb_field(const char *rec, int n)
 {
-static char fld[64];
+static char fld[200];
 const char *prv=rec;
 int len=0;
 while (n>=0)
@@ -469,6 +475,7 @@ while (n>=0)
 	if (len>=sizeof(fld)) m_finish("Internal error 801 field too long [%s]",prv);
 	if (n--) rec+=(len+1); else break;
 	if (!*rec) return(0);	// Added check to avoid going past end, 7/2/19
+//	if (!*rec) {len=0;break;}	// Feb 2022 - return empty string, not nullptr
 	}
 if (len) memmove(fld,rec,len);
 fld[len]=0;
