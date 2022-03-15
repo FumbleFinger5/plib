@@ -9,7 +9,8 @@
 #include "flopen.h"
 #include "drinfo.h"
 #include "db.h"
-//#include "wxp07.h"
+#include "cal.h"
+#include "log.h"
 #include "smdb.h"
 
 int _cdecl cp_em_key(EM_KEY *a, EM_KEY *b)
@@ -78,6 +79,47 @@ return;
 err:
 m_finish("Error creating %s",fn);
 }
+
+void SMDB::locn_upd(char locn)
+{
+ULOCN u={locn, calnow()};
+if (!hdr.locn_upd_rhdl)
+	{
+	hdr.locn_upd_rhdl=zrecadd(db,&u,sizeof(ULOCN));
+	recupd(db,dbgetanchor(db),&hdr,sizeof(hdr));
+	return;
+	}
+int i,sz, ct;
+ULOCN *uu=(ULOCN*)zrecmem(db,hdr.locn_upd_rhdl,&sz);
+ct=sz/sizeof(ULOCN);
+for (i=0; i<ct; i++)
+	if (uu[i].locn==u.locn)
+		{
+		memmove(&uu[i],&u,sizeof(ULOCN));
+		hdr.locn_upd_rhdl=zrecupd(db,hdr.locn_upd_rhdl,uu,sz);
+		recupd(db,dbgetanchor(db),&hdr,sizeof(hdr));
+		memtake(uu);
+		return;
+		}
+uu=(ULOCN*)memrealloc(uu,sz+=sizeof(ULOCN));
+memmove(&uu[ct],&u,sizeof(ULOCN));
+hdr.locn_upd_rhdl=zrecupd(db,hdr.locn_upd_rhdl,uu,sz);
+recupd(db,dbgetanchor(db),&hdr,sizeof(hdr));
+memtake(uu);
+}
+
+void SMDB::locn_list(void)
+{
+if (!hdr.locn_upd_rhdl) {sjhlog("No location update record"); return;}
+int i,sz, ct;
+char s[50];
+ULOCN *uu=(ULOCN*)zrecmem(db,hdr.locn_upd_rhdl,&sz);
+ct=sz/sizeof(ULOCN);
+for (i=0; i<ct; i++)
+	sjhlog("Slot:%d updated %s",uu[i].locn,calfmt(s,"%02D-%02O-%04C %02T%02I",uu[i].dttm));
+memtake(uu);
+}
+
 
 SMDB::~SMDB()
 {
@@ -209,6 +251,7 @@ while (bkyscn_all(em_btr,&rh,&e,&again))
 	if (!ct) continue; // no media (movie was streamed)
 	for (i=biggest=0;i<ct;i++)
 		if (mm[i].sz>biggest) biggest=mm[i].sz;
+memtake(mm);
 	if (biggest==0) m_finish("Fuckit!");
 	Xecho("%7dMb  %s (%4.4d)\r\n", (Ulong)biggest, e.nam, e.year);
 	tct++;

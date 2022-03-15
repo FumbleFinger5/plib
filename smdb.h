@@ -1,9 +1,12 @@
 struct	EM_KEY {char nam[60]; short year, emdb_num; int32_t imdb_num; char rating;}; // Each BTR entry includes RHDL (maybe NULL) to 'mct' MEDIA entries
-struct	EM_KEY1 {EM_KEY e; char director[30], cast[60]; short added, seen, filesz;};
+struct	EM_KEY1 {EM_KEY e; char director[30], cast[60]; short added, seen, filesz, runtime;};
 
 #pragma pack(push, 1)
 struct	EM_MEDIA {char locn, fct, dct, dvd; __int64 sz;};		// The (variable length) array of media locations is in no particular sequence!!!
 #pragma pack(pop)
+
+struct ULOCN {char locn; long dttm;};
+
 
 class SMDB {
 public:
@@ -11,6 +14,8 @@ SMDB(const char *path);						// Constructor used by app progs
 ~SMDB();
 void	update_all(int slot, DYNAG *em);
 int		scan_all(EM_KEY *e, int reverse_order, int *again);
+void	locn_upd(char locn);
+void	locn_list(void);
 void	list_slots(void);
 void	list_numcopies(void);
 void	list_selection(void);
@@ -31,7 +36,7 @@ private:
 int		ct;
 HDL		db,em_btr;
 RHDL	rhdl;
-struct	{char ver, fill[3]; RHDL em_rhdl; char fill2[24];} hdr;
+struct	{char ver, fill[3]; RHDL em_rhdl, locn_upd_rhdl; char fill2[20];} hdr;
 void	db_open(char *fn);
 RHDL	add_or_upd_media(RHDL rh, EM_MEDIA *m, EM_MEDIA *mm, int ct); // 'ct' = number of entries in 'mm' ('m' is just a ptr to a single instance)
 void	list_media(EM_KEY *e, RHDL rh, int dets);	// If dets=True, list all slot folder+size entries

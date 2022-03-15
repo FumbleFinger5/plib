@@ -336,6 +336,14 @@ const char *p=strrchr(s,c);
 return(p?p-s:NOTFND);
 }
 
+
+char	*strxlt(char *str, char from, char to)
+{
+int i;
+while ((i=stridxc(from,str))!=NOTFND) str[i]=to;
+return(str);
+}
+
 char *strend(const char *s)
 {
 return (char *)&s[strlen(s)];

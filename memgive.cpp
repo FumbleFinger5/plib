@@ -59,7 +59,7 @@ while (lo<=hi)
 	{
 	m=((long(hi)+lo)/2);
 	if ((i=(cmp)(ky,T(m)))==0) return(*(p)=m);
-	else if (i<0) hi=m-1; else lo=m+1;
+	if (i<0) hi=m-1; else lo=m+1;
 	}
 *(p)=m+(m<c && (cmp)(ky,T(m))>0);
 return(NOTFND);

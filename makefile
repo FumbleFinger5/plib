@@ -2,7 +2,7 @@ TARGET = libplib.a
 #COMP = g++
 COMP = clang
 #CFLAGS = -I../mylib -ggdb
-CFLAGS = -I../mylib  -fPIE 
+CFLAGS = -I../mylib -ggdb  -fPIE 
 
 # target: prerequisites - the rule head
 # $@  means the target

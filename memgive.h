@@ -13,6 +13,8 @@ void	scrap(void **pointer);
 #define SCRAP(a) {if (a) {delete (a); (a)=0;}}	//		ptr-> class object DON'T FOLLOW WITH SEMICOLON
 
 //void	memchk(char *txt);
+int in_table(int *p, const void *ky, void *tbl, int ct, int sz, PFI_v_v cmp);
+int _cdecl cp_str(char *a, char *b);
 
 class DYNAG
 {										// Class to dynamically allocate space for any number

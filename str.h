@@ -5,9 +5,6 @@
 
 char	*strancpy(char *dst, const char *src, int bufsz);
 char  *stradup(const char *s);
-int   stridxc(char c,const char *s);	// Offset of LEFTMOST (if any) instance of 'c' in 's'
-int   strridxc(char c,const char *s);	// Offset of RIGHTMOST (if any) instance of 'c' in 's'
-int   strinspn(const char *sub, const char *str);
 char  *strfmt(char *str ,const char *fmt,...);
 char  *_strfmt(char*s1 ,const char*s2,va_list va);
 char	*_strfmt(char *str,const char *fmt,va_list);
@@ -18,7 +15,8 @@ char	*strdel(char *str, int ct);				// delete 'ct' chars from front of 'str'
 char	*strfill(char *str, int ct, int chr);	// (sets str[ct]=0)
 char	*strins(char *str, const char *ins);	// add 'ins' to front of 'str'
 char	*strinsc(char *str, int ins);				// add char 'ins' to front of 'str'
-int 	stridxc(char,const char*);
+int   stridxc(char c,const char *s);	// Offset of LEFTMOST (if any) instance of 'c' in 's'
+int   strridxc(char c,const char *s);	// Offset of RIGHTMOST (if any) instance of 'c' in 's'
 int	stridxs(const char *substr, const char *str);	/* substr offset in str, or NOTFND */
 int 	strinspn(const char *any_of_these, const char *in_this_string);
 char	*strjust(char* str, int width, int type, int fillchr);
@@ -26,6 +24,7 @@ char	*strnfmt(char*, int len, const char*,...);
 char	*strrjust(char* str, int width);
 int	strtoken(char*,char*,char*);
 char	*strtrim(char*);
+char	*strxlt(char *str, char from, char to);
 
 char *vb_field(const char *rec, int n);
 
