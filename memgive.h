@@ -4,16 +4,17 @@
 void	*memadup(const void*,Uint);
 void	*memgive(Uint);
 void	*memrealloc(void*,Uint);
-void    memtake(const void *data);
-int	    memtakeall(void);		// Release all blocks allocated by memgive/memrealloc
+void	memtake(const void *data);
+int	memtakeall(void);		// Release all blocks allocated by memgive/memrealloc
 
 void	scrap(void **pointer);
 												// If non-NULL, delete & zeroise...
 #define Scrap(a) scrap((void**)(&(a)))			//		ptr-> allocated memory
 #define SCRAP(a) {if (a) {delete (a); (a)=0;}}	//		ptr-> class object DON'T FOLLOW WITH SEMICOLON
 
-//void	memchk(char *txt);
+// position of 'ky' in 'tbl', or NOTFND
 int in_table(int *p, const void *ky, void *tbl, int ct, int sz, PFI_v_v cmp);
+
 int _cdecl cp_str(char *a, char *b);
 
 class DYNAG

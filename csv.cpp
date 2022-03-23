@@ -16,6 +16,57 @@
 #include <unistd.h>
 #include <time.h>
 
+
+struct NAMP1 {char *name, len;};
+struct NAMPTR {NAMP1 fore, last;};
+
+static char *comma_or_eos(char *a)
+{
+while (*a) if (*a==COMMA) break; else a++;
+return(a);
+}
+
+// Fill in passed NAMPTR with up to 5 forename+lastnane  pointer pairs
+static void fill_np(char *a, NAMPTR *np)
+{
+int n,e, sp;
+for (n=0;n<5;n++)
+    {
+    np[n].fore.name=a;          // we're looking at the forename first
+    sp = e = (comma_or_eos(a) - a);  // points to first (unwanted) char after lastname
+    while (sp>0 && a[sp]!=SPACE) sp--;
+    np[n].last.name=&a[sp+(a[sp]==SPACE)];
+    np[n].last.len = e-sp;
+    if (np[n].last.len) np[n].last.len--;
+    np[n].fore.len = sp;
+    a=np[n].last.name + np[n].last.len;
+    while (*a==COMMA || *a==SPACE) a++;
+    }
+}
+
+static int cp_namp1(NAMP1 *a, NAMP1 *b)
+{
+if (a->len==0 && b->len==0) return(0);
+int len=MIN(a->len,b->len), cmp=0;
+if (len) cmp=memcmp(a->name,b->name,len);
+if (!cmp) cmp=memcmp(&a->len,&b->len,1);
+return(cmp);
+}
+
+int cp_name(char *a, char *b)
+{
+NAMPTR anp[5], bnp[5];
+fill_np(a,anp);
+fill_np(b,bnp);
+int cmp,n;
+for (n=cmp=0; n<5 && !cmp; n++)
+    if ((cmp=cp_namp1(&anp[n].last, &bnp[n].last))==0)
+        cmp=cp_namp1(&anp[n].fore, &bnp[n].fore);
+return(cmp);
+}
+
+
+
 long get_filedate(const char *filename)
 {
 struct stat attrib;
@@ -32,7 +83,7 @@ CSV_READER::CSV_READER(const char *fn)
 	f = flopen(fn, "R");
 	if (!f)
 	{
-		Xecho("Can't open %s\r\n", fn);
+	sjhlog("Can't open %s", fn);
 		return;
 	}
 	readline();
@@ -99,22 +150,22 @@ int CSV_READER::readline(void)
 
 int CSV_READER::fill_tbl(DYNTBL *emk) // Table recsiz may include 'director'
 {
-	while (readline())
+while (readline())
 	{
-		EM_KEY1 e;
-		if (str2EM_KEY(&e))
+	EM_KEY1 e;
+	if (str2EM_KEY(&e))
 		{
-			Xecho("Bad Movie Name %s\r\n", buf);
-			return (0);
+		sjhlog("Bad Movie Name %s\r\n", buf);
+		return (0);
 		}
-		if (emk->in(&e) != NOTFND)
+	if (emk->in(&e) != NOTFND)
 		{
-			Xecho("Dup Movie Name %s\r\n", buf);
-			return (0);
+		sjhlog("Duplicate movie (IMDb number %d) %s %4d\r\n", e.e.imdb_num, e.e.nam, e.e.year);
+		return (0);
 		}
-		emk->put(&e);
+	emk->put(&e);
 	}
-	return (emk->ct);
+return (emk->ct);
 }
 
 CSV_READER::~CSV_READER()
