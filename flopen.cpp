@@ -231,7 +231,7 @@ return((ushort)ct);
 }
 
 // Return the Ascii code of character read, or -1 if EOF or a ^Z
-static int flgetc(HDL h_fl)
+int flgetc(HDL h_fl)
 {
 int	chr=H_FL->ungot_c;
 if (chr) H_FL->ungot_c = 0; else if (!flget(&chr, 1, h_fl)) chr=CPMEOF;

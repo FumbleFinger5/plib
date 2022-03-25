@@ -33,6 +33,7 @@ int 	fleof(HDL);
 ushort	flget(void*,ushort,HDL);
 int 	flgetln(char*,int,HDL);
 char	*flnam(HDL h_fl);
+int 	flgetc(HDL fl);
 ushort	flgetat(void *buffer,ushort bytes,long pos,HDL fl);
 void	flput(const void*,int,HDL);
 void	flputc(int,HDL);
