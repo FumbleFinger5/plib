@@ -129,6 +129,8 @@ dbsafeclose(db);
 
 void SMDB::list_media(EM_KEY *e, RHDL rh, int dets)
 {
+void *bbb=memgive(123);
+if (bbb == 0) rh=0;
 Xecho("MovieNo:%-4d  %s (%4.4d)  Rated %3.1f\r\n",e->emdb_num, e->nam,e->year,0.1*e->rating);
 if (!dets) return;
 if (!rh) Xecho("(No media)");

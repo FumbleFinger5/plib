@@ -681,7 +681,7 @@ HDL btropen(HDL h_db, RHDL rh_bhdr)
 		b->cmppart = cp_ushort;
 		break;
 	case DT_LONG:
-		b->cmppart = cp_long;
+		b->cmppart = cp_int32_t;
 		break;
 	case DT_ULONG:
 		b->cmppart = cp_ulong;

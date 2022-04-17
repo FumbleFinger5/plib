@@ -154,6 +154,8 @@ int _cdecl cp_short2(const void *a, const void *b);
 int		cp_ushort(const void *p1, const void *p2);		// the values as parameters
 
 int		cp_long(const void *p1, const void *p2);
+int		cp_int32_t(const void *p1, const void *p2);
+
 int		cp_ulong(const void *p1, const void *p2);
 int _cdecl cp_ulong2(const void *a, const void *b);
 int _cdecl cp_ulong4(const void *a, const void *b);
@@ -163,5 +165,7 @@ int		cp_short_v(short a, short b);					// These 4 take the ACTUAL
 int		cp_ushort_v(ushort a, ushort b);				// values as parameters
 int		cp_long_v(long a, long b);
 int		cp_ulong_v(Ulong a, Ulong b);
+
+
 
 #endif

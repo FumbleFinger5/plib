@@ -11,7 +11,7 @@
 #include "log.h"
 
 // Only define MEMLOG when troubleshooting (don't want the overrhead in normal operation)
-#define MEMLOG 1
+//#define MEMLOG 1
 
 int first_leak;
 

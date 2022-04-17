@@ -13,7 +13,7 @@
 
 void global_init(const char *main_pth)
 {
-//leak_tracker(YES);
+leak_tracker(YES);
 //set_search_path(main_pth);
 //tiv=new TI_VAR();
 
@@ -37,21 +37,7 @@ dbstop();
 //set_search_path(0);
 int err=NO;
 //Xecho(0);
-//err=leak_tracker(NO);
-
-#ifdef DLLLOG
-extern int	dlllog;
-if ((dlllog>0 && !nolog_this_dll()) || err)
-	{
-	delete new DllLog(0,0);
-	extern int first_leak;
-	char str[256];
-	strcpy(str,"global_closedown ");
-	if (err) strendfmt(str,"%d memory leaks! First=%d",err,first_leak);
-	else strcat(str,"OK");
-	sjhLog("%s:%s",caller_name,str);
-	}
-#endif // DLLLOG
+err=leak_tracker(NO);
 
 //sjhLog(0);	// clears 'current log file' path
 return(err);
