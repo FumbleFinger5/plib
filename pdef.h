@@ -1,3 +1,6 @@
+#ifndef PDEF_H
+#define PDEF_H
+
 #include <stdint.h>
 
 #define _cdecl
@@ -11,7 +14,7 @@
 #define	FA_DIR		0x10	// Directory
 #define	FA_SPECIAL	0x40	// NOT regular file / directory (Hidden?, Label?, System?,...)
 
-typedef long long __int64;
+//typedef long long int64_t;
 typedef	unsigned int Uint;
 //typedef	unsigned long ulong___;
 typedef	uint32_t Ulong;
@@ -34,6 +37,7 @@ typedef	uint32_t	RHDL;	// database record handle WAS 'long''
 
 #define	CHR_HASH	35
 #define	CHR_QT1	39
+#define	CHR_QTDOUBLE	34
 
 #define	COMMA	','
 #define	SEMICOLON	';'
@@ -160,3 +164,4 @@ int		cp_ushort_v(ushort a, ushort b);				// values as parameters
 int		cp_long_v(long a, long b);
 int		cp_ulong_v(Ulong a, Ulong b);
 
+#endif

@@ -10,7 +10,7 @@ struct FILEINFO
 	{
 	ushort	attr;		// attributes of file : system, hidden, directory etc
 	long	dttm;		// creation date and time of file
-	__int64	size;		// size of file in bytes
+	int64_t	size;		// size of file in bytes
 	char	name[255];	// name of file (or directory)
 	};
 
@@ -21,5 +21,7 @@ void	drscnrls(DIR *scn);
 
 int drinfo(const char *path, FILEINFO *pfile_info);
 int drisdir(const char *directory_path);
+int drattrget(const char *path, short *attr);
+
 
 

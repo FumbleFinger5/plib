@@ -59,11 +59,12 @@ btr_set_cmppart(em_btr,(PFI_v_v)cp_em_key);
 
 
 
+
 SMDB::SMDB(const char *epth)
 {
 char fn[100];
 strfmt(fn,"%s/%s",epth,"SMDB.dbf");
-//Xecho("Try to open [%s]\r\n",fn);
+//sjhlog("SMDB opening [%s]\r\n",fn);
 if (access(fn, F_OK ))		// mode=F_OK=0, where non-zero return value means file doesn't exist AT ALL
 	{						// mode could be either or both (R_OK|W_OK) for "User has Read / Write access"
 	Xecho("Creating database %s\r\n",fn);
@@ -136,13 +137,60 @@ else
 	int i, sz, ct;
 	EM_MEDIA *mm = (EM_MEDIA*)zrecmem(db,rh,&sz);
 	ct=sz/sizeof(EM_MEDIA);
-	for (i=0;i<ct;i++) Xecho("%2d:%dMb  ",mm[i].locn,(int)mm[i].sz);
+	for (i=0;i<ct;i++)
+		{
+		Xecho("Films%02d  %3.1fGb  %ld",mm[i].locn, 0.1 * (mm[i].sz/100000000), mm[i].sz);
+		}
 	memtake(mm);
 	}
 Xecho("%s","\r\n");
 }
 
-struct EMTOT {char slot; short ct; __int64 tot;};
+int SMDB::find_movie_by_imdb_num2(EM_KEY *pe, EM_MEDIA *m)
+{
+int again=NO, sz=0;
+EM_KEY e;
+e.imdb_num=pe->imdb_num;
+while (bkyscn_all(em_btr,0,&e,&again))
+	{
+	if (e.imdb_num==pe->imdb_num)
+		{
+		RHDL rh;
+		if (!bkysrch(em_btr,BK_EQ,&rh,&e)) throw(94);
+		if (rh)
+			{
+			EM_MEDIA *mm = (EM_MEDIA*)zrecmem(db,rh,&sz);
+			if (sz > (MAX_EMM * sizeof(EM_MEDIA))) sz = (MAX_EMM * sizeof(EM_MEDIA));
+			if (sz) memmove(m,mm,sz);
+			memtake(mm);
+			}
+		memmove(pe,&e,sizeof(EM_KEY));
+		return(sz/sizeof(EM_MEDIA));
+		}
+	}
+return(NOTFND);
+}
+
+void SMDB::sz_by_imdb(DYNTBL *tbl)
+{
+int again=NO, i, sz, ct;
+RHDL rh;
+EM_KEY e;
+while (bkyscn_all(em_btr,&rh,&e,&again))
+	{
+	if (rh)
+		{
+		IM_SIZE is={e.imdb_num,0};
+		EM_MEDIA *mm = (EM_MEDIA*)zrecmem(db,rh,&sz);
+		ct=sz/sizeof(EM_MEDIA);
+		for (i=0;i<ct;i++) if (mm[i].sz > is.sz) is.sz=mm[i].sz;
+		memtake(mm);
+		tbl->put(&is);		// if (is.sz==0) m_finish("dammit");
+		}
+	}
+}
+
+struct EMTOT {char slot; short ct; int64_t tot;};
 
 
 void SMDB::list_slots(void)
@@ -175,7 +223,7 @@ Xecho("Highest= %ldGb\r\n", highest=zz);
 	memtake(mm);
 	}
 Xecho("Tracking %d EMDB Movies, %d with no media\r\n", btrnkeys(em_btr), missing);
-__int64 grand=0;
+int64_t grand=0;
 for (ett=(EMTOT*)t->get(i=0);i++ < t->ct;ett++)
 	{
 	grand+=ett->tot;
@@ -199,7 +247,7 @@ for (ct=0;bkyscn_all(em_btr,&rh,&ee[ct],&again);ct++)
 		{
 		int sz;
 		EM_MEDIA *mm = (EM_MEDIA*)zrecmem(db,rh,&sz);	// Returns a nullptr & sets *sz=0 if RHDL is zero
-		__int64 lo=mm[0].sz, hi;
+		int64_t lo=mm[0].sz, hi;
 		if (lo < mm[1].sz) hi=mm[1].sz;
 		else {hi=lo; lo=mm[1].sz;}
 		if (lo > (hi/2))
@@ -242,7 +290,7 @@ int		again=NO;
 int		i, sz, tct=0, minrate=90;
 EM_KEY	e;
 RHDL	rh;
-__int64 total=0, biggest;
+int64_t total=0, biggest;
 while (bkyscn_all(em_btr,&rh,&e,&again))
 	{
 	if (e.rating<minrate) continue;
@@ -264,7 +312,7 @@ Xecho("%7dGb  %d movies rated %2.1f\r\n", (Ulong)(total / 1024), tct, (0.1 * min
 void SMDB::josh_copy(DYNTBL *wanted_imdb_numbers)
 {
 int		again=NO;
-__int64 total=0;
+int64_t total=0;
 int		i;
 EM_KEY	e;
 RHDL	rh;
@@ -275,7 +323,7 @@ while (bkyscn_all(em_btr,&rh,&e,&again))
 		{
 		int i, sz, ct;
 		int biggest_i;
-		__int64 biggest;
+		int64_t biggest;
 		EM_MEDIA *mm = (EM_MEDIA*)zrecmem(db,rh,&sz);
 		ct=sz/sizeof(EM_MEDIA);
 		for (i=biggest=biggest_i=0;i<ct;i++) 
@@ -384,7 +432,6 @@ while (bkyscn_all(em_btr,0,&e,&again))
 return(emk->ct);
 }
 
-
 int SMDB::scan_all(EM_KEY *e, int reverse_order, int *again)
 {
 if (!(*again)++)
@@ -394,20 +441,29 @@ return(bkysrch(em_btr,reverse_order?BK_LT:BK_GT,0,e));
 
 void SMDB::find_movie_by_imdb_num(int imdb_num)	// Find which discs have this movie
 {
-int i, again=NO, sz=0;
+int again=NO;
 EM_KEY e;
-while (scan_all(&e, YES, &again))
-	{
-	if (e.imdb_num!=imdb_num) continue;
-	RHDL rh;
-	if (!bkysrch(em_btr,BK_EQ,&rh,&e)) m_finish("bums!");
-	list_media(&e,rh,YES);
-	return;
-	}
+RHDL rh;
+while (bkyscn_all(em_btr, &rh, &e, &again))
+	if (e.imdb_num==imdb_num)
+		{
+		list_media(&e,rh,YES);
+		return;
+		}
 Xecho("IMDB MovieNumber %d not in database\r\n",imdb_num);
 }
 
-static int cp_sz_locn(__int64 sz_a, __int64 sz_b, char locn_a, char locn_b) 
+int SMDB::get_emk_by_imdb_num(EM_KEY *e)
+{
+int again=NO, got=NO;
+EM_KEY ee;
+while (!got && bkyscn_all(em_btr, 0, &ee, &again))	// don't need rh here
+	got=(ee.imdb_num==e->imdb_num);
+if (got) memmove(e,&ee,sizeof(EM_KEY));
+return(got);
+}
+
+static int cp_sz_locn(int64_t sz_a, int64_t sz_b, char locn_a, char locn_b) 
 {
 int cp=0;
 if (sz_a>sz_b) cp=1;

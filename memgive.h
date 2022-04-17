@@ -1,5 +1,5 @@
-
-//typedef	unsigned int Uint;
+#ifndef MEMGIVE_H
+#define MEMGIVE_H
 
 void	*memadup(const void*,Uint);
 void	*memgive(Uint);
@@ -63,3 +63,4 @@ private:
 PFI_v_v	cp;
 };
 
+#endif

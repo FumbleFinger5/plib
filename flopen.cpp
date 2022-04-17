@@ -286,6 +286,19 @@ if (len) pf->flag&=~FIL_EOF;	// If we got some chars, we can't be at eof
 return((pf->flag&FIL_EOF) ? -1 : len);
 }
 
+int flgets(char *str, int bufsiz, HDL h_fl)	// NOTE! - bufsiz has to be big enough to include terminating NULL
+{
+int	len, c;
+for (len=0; len<bufsiz; str[len++]=(char)c)
+  	{
+	c=flgetc(h_fl);
+  	if (!c || c==NOTFND) break;
+	if (len==1 && ((unsigned char*)str)[0]==0xFF && c==0xFE) throw(95);	// looks like Unicode!
+	}
+if (c) {if (len>=bufsiz) throw(94); else str[len++]=0;}
+return(strlen(str));
+}
+
 
 void flput(const void *data, int n, HDL h_fl)
 {
@@ -332,7 +345,7 @@ if (H_FL->flag&FIL_DIRTY)
 	}
 }
 
-void flputs(const void *str, HDL f)
+void flputs(const void *str, HDL f)	// if eos is non-zero, include EOS null-byte in o/p
 {
 if (*((char*)str)) flput((char*)str,strlen((char*)str),f);
 }

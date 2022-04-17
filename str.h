@@ -19,6 +19,7 @@ int   stridxc(char c,const char *s);	// Offset of LEFTMOST (if any) instance of 
 int   strridxc(char c,const char *s);	// Offset of RIGHTMOST (if any) instance of 'c' in 's'
 int	stridxs(const char *substr, const char *str);	/* substr offset in str, or NOTFND */
 int 	strinspn(const char *any_of_these, const char *in_this_string);
+void strip(char *str, char chr); // remove any & all occurences of 'chr' in 'str'
 char	*strjust(char* str, int width, int type, int fillchr);
 char	*strnfmt(char*, int len, const char*,...);
 char	*strrjust(char* str, int width);
@@ -37,12 +38,12 @@ extern	int a2err, a2err_char;			// Error on last call to a2l() (0=OK, 1=Fail, 2=
 
 
 // #define BIT8_AND(a,b) ((*(long*)(a)&*(long*)(b)) || (*(long*)(&((char*)(a))[4])&*(long*)(&((char*)(b))[4])))
-#define BIT8_AND(a,b)	(  ((*(__int64*)(a)) & (*(__int64*)(b)))  !=0)	// TRUE if any bit is on in BOTH 8-byte flags
-#define BIT8_ANDAND(a,b)	(*(__int64*)(a)) &= (*(__int64*)(b))		// Logical AND all 64 bits in 'b' into 'a'
-#define BIT8_OR(a,b)	(*(__int64*)(a)) |= (*(__int64*)(b))			// Logical OR all 64 bits in 'b' into 'a'
-#define BIT8_XOR(a,b)	(*(__int64*)(a)) ^= (*(__int64*)(b))			// Logical XOR all 64 bits in 'b' into 'a'
-#define BIT8_ON(a)		(*(__int64*)(a) !=-0)							// TRUE if any bit is on in this 8-byte flag
-#define BIT8_SET0(a)	(*(__int64*)(a)=0)								// Set all 64 bitflags in 8-byte area to zero
+#define BIT8_AND(a,b)	(  ((*(int64_t*)(a)) & (*(int64_t*)(b)))  !=0)	// TRUE if any bit is on in BOTH 8-byte flags
+#define BIT8_ANDAND(a,b)	(*(int64_t*)(a)) &= (*(int64_t*)(b))		// Logical AND all 64 bits in 'b' into 'a'
+#define BIT8_OR(a,b)	(*(int64_t*)(a)) |= (*(int64_t*)(b))			// Logical OR all 64 bits in 'b' into 'a'
+#define BIT8_XOR(a,b)	(*(int64_t*)(a)) ^= (*(int64_t*)(b))			// Logical XOR all 64 bits in 'b' into 'a'
+#define BIT8_ON(a)		(*(int64_t*)(a) !=-0)							// TRUE if any bit is on in this 8-byte flag
+#define BIT8_SET0(a)	(*(int64_t*)(a)=0)								// Set all 64 bitflags in 8-byte area to zero
 
 class BitMap
 {

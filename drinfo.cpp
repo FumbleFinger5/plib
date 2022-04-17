@@ -8,6 +8,7 @@
 #include "pdef.h"
 #include "str.h"
 #include "memgive.h"
+#include "log.h"
 #include "drinfo.h"
 
 
@@ -95,15 +96,20 @@ return(ok);
 }
 #endif	// pre_Aug21
 
+// Get file details, return YES = OK, NO = Fail
 int drinfo(const char *path, FILEINFO *fi)
 {
 struct stat sb;
-realpath(path,fi->name);	// Fully expand the passed path into passed FI structure
-stat(path,&sb);
+realpath(path,fi->name);			// Fully expand passed path into passed FI structure
+if (stat(path,&sb))
+	{
+//	sjhlog("stat %s [%s] returned TRUE",path,fi->name);
+	return(NO);	// some kind of error (copied to system global 'errno')
+	}
 fi->attr=FA_SPECIAL;
 if (S_ISDIR(sb.st_mode))
 	{
-	printf("%s is DIR\r\n",path);
+//	printf("%s is DIR\r\n",path);
 	fi->attr=FA_DIR;
 	}
 else if (S_ISREG(sb.st_mode)) fi->attr=FA_ORDINARY; // ordinary file - pforce attr is just 0
