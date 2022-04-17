@@ -7,29 +7,153 @@
 #include "pdef.h"
 #include "memgive.h"
 #include "str.h"
+#include "flopen.h"
+#include "log.h"
 
+//#define MEMLOG 1
+
+int first_leak;
+
+static int		uniq;
+
+static TAG		*logger;
+static DYNTBL	*log;
+
+
+#define MAXCT 65000		// 02/12/02
+
+#ifdef MEMLOG		// see pdecs.h
+#define FST	12		// pre-25/09/02 was 6 (size was 2-byte short, not 4-byte int)
+#define LST 4		// 4
+#else
+#define FST	0
+#define LST 0
+#endif
+#define EXTRA_BYTES (FST+LST)
+
+static void **a;
+static int ct,c1;
+
+/*		ex malloc.h
+#define _HEAPEMPTY      (-1)
+#define _HEAPOK         (-2)
+#define _HEAPBADBEGIN   (-3)
+#define _HEAPBADNODE    (-4)
+#define _HEAPEND        (-5)
+#define _HEAPBADPTR     (-6)
+#define _FREEENTRY      0
+#define _USEDENTRY      1
+*/
+int do_memchk;
+void memchk(char *txt)
+{
+if (!do_memchk) return;
+#ifdef MEMLOG
+int totsiz=0;
+for (int i=0;i<ct;i++)
+	{
+	char *c=(char*)a[i];
+	long siz=*(long*)c;
+	totsiz+=siz;
+	if ((*(long*)&c[FST-4]!=0x12345678 || *(long*)&c[siz+FST]!=0x87654321))
+		{
+		char w[80];
+//strfmt(w,"Corrupt memory:%s",txt);
+		strcpy(w,"Corrupt memory:");
+		strcat(w,txt);
+		SetErrorText("%s",w);
+		throw SE_MEMBAD;
+		}
+	}
+int open_file_handles_ct(void);
+char w[128];
+strfmt(w,"Open Files:%ld, Objects:%ld, MemUsed:%ld",open_file_handles_ct(),log->ct,totsiz);
+sjhlog("%s %s",txt,w);
+#endif
+//int rc=_heapchk();
+}
+
+#ifdef MEMLOG
+#define LUMP 1024		// Chunk size for extending 'a'
+static void*  log_give(void *p, Uint siz)	// *p==REAL pointer	// Log this block as 'allocated'
+{																// and return address of "app-level data portion" of block
+char *c=(char*)p;
+Uint *u=(Uint*)p;
+u[0]=siz;
+u[1]=++uniq; 
+if (uniq==487)		// search here for first_leak as reported by dllclosedown
+uniq=uniq;	// LINK01 **************** run to cursor HERE to Find when unique sequence number of this mem_leak was allocated
+*(long*)&c[FST-4]=0x12345678;				// Put our special values before and after the address returned to app,
+*(long*)&c[siz+FST]=0x87654321;				// so we can check for buffer over/underrun when it's released
+
+if (ct>=MAXCT) throw SE_OUTOFHEAP;
+if (c1<=ct)
+	{
+	c1+=LUMP;
+	a=(void**)(ct?realloc(a,c1*sizeof(void*)):calloc(c1,sizeof(void*)));
+	}
+a[ct++]=p;
+return(&c[FST]);
+}
+
+static void  log_take(const void *p)	// *p==PSEUDO pointer from App	// Remove this block from the
+{																		// table of 'allocated' addresses
+char *c=((char*)p)-FST;					// (get the REAL pointer to allocated memory block)
+long siz=*(Uint*)c;
+if ((*(long*)&c[FST-4]!=0x12345678 || *(long*)&c[siz+FST]!=0x87654321))
+	{
+	SetErrorText("Corrupt memory block over/underrun");
+	throw SE_MEMBAD;
+	}
+for (int	i=ct;i--;)
+	if (a[i]==c)
+		{
+		if (--ct>i) memmove(&a[i],&a[i+1],(ct-i)*sizeof(void*));
+		return;
+		}
+throw SE_MEMPTR;
+}
+#else
+#define log_give(p,siz) (p)
+#endif
+
+
+static void* give(Uint siz)
+{
+if (!siz)
+	throw SE_BADALLOC;
+void *p=calloc(siz+EXTRA_BYTES,1);
+return(log_give(p,siz));
+}
 
 void *memrealloc(void *data, Uint siz)		// *data==PSEUDO pointer
 {
+#ifdef MEMLOG
+if (data) log_take(data);
+#endif
 if (!siz) throw SE_BADALLOC;
-char *c=(char*)data;
-c=(char*)realloc(c,siz);
-return(c);
+char *c=(char*)data; if (c) c-=FST;
+c=(char*)realloc(c,siz+EXTRA_BYTES);
+return(log_give(c,siz));
 }
+
 void memtake(const void *data)
 {
 if(data)
 	{
-	free((void*)(((char*)data)));
+#ifdef MEMLOG
+	log_take(data);
+#endif
+	free((void*)(((char*)data)-FST));
 	}
 }
+
 
 void *memgive(Uint siz) 
 {
 if (!siz)
 	throw SE_BADALLOC;
-void *p=calloc(siz,1);
-return(p);
+return(give(siz));
 }
 
 void *memadup(const void *data, Uint siz)
@@ -47,6 +171,30 @@ if (*pointer)
 	}
 }
 
+int memtakeall(void)						// Release all blocks allocated by
+{											// by memgive() or memrealloc()
+int leak=ct;
+while (ct)
+	{
+#ifdef MEMLOG
+		{
+		int *pi=(int*)a[ct-1];
+//		int sz=pi[0];				// get the (app-requested) allocated block size,
+		int sq=pi[1];				// - unique sequence number, (of this mem_leak)
+		if (!first_leak)
+			first_leak=sq;			// LINK01 
+//		char *data=(char*)&pi[3];	// - and 'pointer to app-perceived data area'
+		}							// so we can track down where it got allocated by the app
+#endif
+	memtake(((char*)(a[ct-1]))+FST);		// (memtake decrements ct)
+	}
+if (c1)
+	{
+	c1=0;
+	free(a);
+	}
+return(leak);
+}
 
 #define T(i) &((char*)tbl)[(i)*sz]
 int in_table(int *p, const void *ky, void *tbl, int c, int sz, PFI_v_v cmp)
@@ -386,4 +534,92 @@ return(cmp);
 }
 
 int _cdecl cp_short2(const void *a, const void *b) {return(cp_shortn((short*)a,(short*)b,2));}
+
+static int zct;
+
+TAG::TAG()
+{
+if (log)
+	{
+	id=++zct;
+if (id==32)
+{
+//assert(0);
+id=32;						// run to cursor HERE to Find when class_leak 'id' was instantiated
+}
+	void *ptr=(void*)this;
+	log->put(&ptr);
+	}
+else id=NO;
+}
+
+TAG::TAG(int first)
+{
+first=first; // ??????? what's this param for ?????
+log=new DYNTBL(4,cp_long);
+id=NOTFND;
+}
+
+int TAG::leaks(void)
+{
+DYNTBL *w=log;
+log=0;
+int i,ct;
+for (i=ct=0;i<w->ct;i++)
+	{
+	void *v=w->get(i);
+	TAG *t=*(TAG**)v;
+	int leak=t->id;
+if (!first_leak)
+{
+first_leak=leak*10+1;
+//assert(first_leak!=11);
+}
+	ct++;
+	}
+delete w;
+return(ct);
+}
+
+TAG::~TAG()
+{
+if (log)
+	{
+	if (id>0)
+		{
+		void *ptr=(void*)this;
+		int ck=log->ct;
+		log->del(log->in(&ptr));
+		if (log->ct!=ck-1) m_finish("dammit");
+		}
+	if (id==NOTFND)
+		{
+		if (leaks())
+			m_finish("Logged Class instances not released!");
+		}
+	}
+}
+
+int leak_tracker(int start)
+{
+#ifndef MEMLOG
+return(0);
+#endif
+if (start)
+	{
+	assert(logger==0);
+	logger=new TAG(YES);
+	return(0);
+	}
+
+assert(logger!=0);
+void nolog_rls(void);
+nolog_rls();
+int class_leak=logger->leaks();
+SCRAP(logger);
+int fleaks=flcloseall();				// any non=closed files?
+int mem_leak=memtakeall();
+return(class_leak+fleaks+mem_leak);
+
+}
 

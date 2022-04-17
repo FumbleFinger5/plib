@@ -17,7 +17,18 @@ int in_table(int *p, const void *ky, void *tbl, int ct, int sz, PFI_v_v cmp);
 
 int _cdecl cp_str(char *a, char *b);
 
-class DYNAG
+class TAG {			// A class to dynamically allocate space for any number
+public:					// of variable (elemsz=0) or fixedlen (elemsz>0) strings
+TAG	();	// and retrieve any item by number as requested
+TAG (int first);
+~TAG	();
+int leaks(void);
+private:
+int	id;
+};
+int leak_tracker(int start);
+
+class DYNAG: public TAG
 {										// Class to dynamically allocate space for any number
 public:								// of variable-length strings (_sz=0) or fixedlen items (_sz>0)
 DYNAG	(int _sz, int _ct=0);	// and retrieve any item by number as requested
