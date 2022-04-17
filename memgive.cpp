@@ -10,7 +10,8 @@
 #include "flopen.h"
 #include "log.h"
 
-//#define MEMLOG 1
+// Only define MEMLOG when troubleshooting (don't want the overrhead in normal operation)
+#define MEMLOG 1
 
 int first_leak;
 
@@ -23,7 +24,7 @@ static DYNTBL	*log;
 #define MAXCT 65000		// 02/12/02
 
 #ifdef MEMLOG		// see pdecs.h
-#define FST	12		// pre-25/09/02 was 6 (size was 2-byte short, not 4-byte int)
+#define FST	12		// pre-25/09/02 was 6 (size was 2-byte short, not 4-byte int32_t)
 #define LST 4		// 4
 #else
 #define FST	0
@@ -53,9 +54,9 @@ int totsiz=0;
 for (int i=0;i<ct;i++)
 	{
 	char *c=(char*)a[i];
-	long siz=*(long*)c;
+	int32_t siz=*(int32_t*)c;
 	totsiz+=siz;
-	if ((*(long*)&c[FST-4]!=0x12345678 || *(long*)&c[siz+FST]!=0x87654321))
+	if ((*(int32_t*)&c[FST-4]!=0x12345678 || *(int32_t*)&c[siz+FST]!=0x87654321))
 		{
 		char w[80];
 //strfmt(w,"Corrupt memory:%s",txt);
@@ -73,6 +74,11 @@ sjhlog("%s %s",txt,w);
 //int rc=_heapchk();
 }
 
+void give_first_leak(int sz)	// breakpoint HERE after setting sought uniq value 10 lines down...
+{
+sz=ct;
+}
+
 #ifdef MEMLOG
 #define LUMP 1024		// Chunk size for extending 'a'
 static void*  log_give(void *p, Uint siz)	// *p==REAL pointer	// Log this block as 'allocated'
@@ -81,10 +87,10 @@ char *c=(char*)p;
 Uint *u=(Uint*)p;
 u[0]=siz;
 u[1]=++uniq; 
-if (uniq==487)		// search here for first_leak as reported by dllclosedown
-uniq=uniq;	// LINK01 **************** run to cursor HERE to Find when unique sequence number of this mem_leak was allocated
-*(long*)&c[FST-4]=0x12345678;				// Put our special values before and after the address returned to app,
-*(long*)&c[siz+FST]=0x87654321;				// so we can check for buffer over/underrun when it's released
+if (uniq==40)				// set to value of first_leak as reported by dllclosedown
+give_first_leak(siz);	// breakpoint HERE when unique sequence number of the mem_leak is allocated
+*(int32_t*)&c[FST-4]=0x12345678;				// Put our special values before and after the address returned to app,
+*(int32_t*)&c[siz+FST]=0x87654321;				// so we can check for buffer over/underrun when it's released
 
 if (ct>=MAXCT) throw SE_OUTOFHEAP;
 if (c1<=ct)
@@ -99,8 +105,8 @@ return(&c[FST]);
 static void  log_take(const void *p)	// *p==PSEUDO pointer from App	// Remove this block from the
 {																		// table of 'allocated' addresses
 char *c=((char*)p)-FST;					// (get the REAL pointer to allocated memory block)
-long siz=*(Uint*)c;
-if ((*(long*)&c[FST-4]!=0x12345678 || *(long*)&c[siz+FST]!=0x87654321))
+int32_t siz=*(Uint*)c;
+if ((*(int32_t*)&c[FST-4]!=0x12345678 || *(int32_t*)&c[siz+FST]!=0x87654321))
 	{
 	SetErrorText("Corrupt memory block over/underrun");
 	throw SE_MEMBAD;
@@ -205,7 +211,7 @@ m=lo=0;
 hi=c-1;
 while (lo<=hi)
 	{
-	m=((long(hi)+lo)/2);
+	m=((int32_t(hi)+lo)/2);
 	if ((i=(cmp)(ky,T(m)))==0) return(*(p)=m);
 	if (i<0) hi=m-1; else lo=m+1;
 	}
@@ -335,7 +341,7 @@ void DYNAG::del(int n)
 char *p=(char *)get(n);
 if (p)
 	{
-	int to=long(p)-long(a),this_len=len;
+	int to=(int)(long(p)-long(a)), this_len=len;
 	ct--;
 	if (!this_len)
 		{
@@ -501,7 +507,7 @@ int _cdecl cp_mem8(const void *a, const void *b) {return(memcmp(a,b,8));}
 
 int cp_short_v(short a, short b)	{return((a<b)?-1:(a>b));}
 int cp_ushort_v(ushort a, ushort b){return((a<b)?-1:(a>b));}
-int cp_long_v(long a, long b)		{return((a<b)?-1:(a>b));}
+int cp_long_v(int32_t a, int32_t b)		{return((a<b)?-1:(a>b));}
 int cp_ulong_v(Ulong a, Ulong b)	{return((a<b)?-1:(a>b));}
 
 int cp_short(const void *a, const void *b)
@@ -510,8 +516,11 @@ int cp_short(const void *a, const void *b)
 int cp_ushort(const void *a, const void *b)
 {return((*((ushort*)a)<*((ushort*)b))?-1:(*((ushort*)a)>*((ushort*)b)));}
 
-int cp_long(const void *a, const void *b)
-{return((*((long*)a)<*((long*)b))?-1:(*((long*)a)>*((long*)b)));}
+//int cp_long(const void *a, const void *b)
+//{return((*((long*)a)<*((long*)b))?-1:(*((long*)a)>*((long*)b)));}
+
+int cp_int32_t(const void *a, const void *b)
+{return((*((int32_t*)a)<*((int32_t*)b))?-1:(*((int32_t*)a)>*((int32_t*)b)));}
 
 int cp_ulong(const void *a, const void *b)
 {return((*((Ulong*)a)<*((Ulong*)b))?-1:(*((Ulong*)a)>*((Ulong*)b)));}
@@ -556,7 +565,7 @@ else id=NO;
 TAG::TAG(int first)
 {
 first=first; // ??????? what's this param for ?????
-log=new DYNTBL(4,cp_long);
+log=new DYNTBL(4,cp_int32_t);
 id=NOTFND;
 }
 
@@ -613,8 +622,6 @@ if (start)
 	}
 
 assert(logger!=0);
-void nolog_rls(void);
-nolog_rls();
 int class_leak=logger->leaks();
 SCRAP(logger);
 int fleaks=flcloseall();				// any non=closed files?
