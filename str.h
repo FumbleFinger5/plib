@@ -17,7 +17,7 @@ char	*strins(char *str, const char *ins);	// add 'ins' to front of 'str'
 char	*strinsc(char *str, int ins);				// add char 'ins' to front of 'str'
 int   stridxc(char c,const char *s);	// Offset of LEFTMOST (if any) instance of 'c' in 's'
 int   strridxc(char c,const char *s);	// Offset of RIGHTMOST (if any) instance of 'c' in 's'
-int	stridxs(const char *substr, const char *str);	/* substr offset in str, or NOTFND */
+int	stridxs(const char *substr, const char *str);	// return offset of substr in str, or NOTFND
 int 	strinspn(const char *any_of_these, const char *in_this_string);
 void strip(char *str, char chr); // remove any & all occurences of 'chr' in 'str'
 char	*strjust(char* str, int width, int type, int fillchr);

@@ -1,3 +1,5 @@
 libplib.a
 flopen.o
 *.o
+libplib.a
+memgive.o

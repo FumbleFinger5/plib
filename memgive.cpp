@@ -35,16 +35,6 @@ static DYNTBL	*log;
 static void **a;
 static int ct,c1;
 
-/*		ex malloc.h
-#define _HEAPEMPTY      (-1)
-#define _HEAPOK         (-2)
-#define _HEAPBADBEGIN   (-3)
-#define _HEAPBADNODE    (-4)
-#define _HEAPEND        (-5)
-#define _HEAPBADPTR     (-6)
-#define _FREEENTRY      0
-#define _USEDENTRY      1
-*/
 int do_memchk;
 void memchk(char *txt)
 {
@@ -58,11 +48,7 @@ for (int i=0;i<ct;i++)
 	totsiz+=siz;
 	if ((*(int32_t*)&c[FST-4]!=0x12345678 || *(int32_t*)&c[siz+FST]!=0x87654321))
 		{
-		char w[80];
-//strfmt(w,"Corrupt memory:%s",txt);
-		strcpy(w,"Corrupt memory:");
-		strcat(w,txt);
-		SetErrorText("%s",w);
+		SetErrorText("Corrupt memory:%s",txt);
 		throw SE_MEMBAD;
 		}
 	}
