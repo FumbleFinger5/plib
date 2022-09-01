@@ -9,6 +9,7 @@
 #include "memgive.h"
 #include "flopen.h"
 #include "str.h"
+#include "log.h"
 
 static DYNTBL *open_file_handles;
 
@@ -27,7 +28,6 @@ if	(result < 0)
 	char txt[128];
 	strfmt(txt,"attempting to READ %d bytes",n);
 	if (pf->fbuf) strendfmt(txt," from offset %d",pf->at_byte);
-//	sjhlog_file_error(pf->fnam, txt);
 	throw(SE_BADREAD);
 	}
 return(result);
@@ -286,6 +286,7 @@ if (len) pf->flag&=~FIL_EOF;	// If we got some chars, we can't be at eof
 return((pf->flag&FIL_EOF) ? -1 : len);
 }
 
+// (might not want this one any more)
 int flgets(char *str, int bufsiz, HDL h_fl)	// NOTE! - bufsiz has to be big enough to include terminating NULL
 {
 int	len, c;
@@ -297,6 +298,21 @@ for (len=0; len<bufsiz; str[len++]=(char)c)
 	}
 if (c) {if (len>=bufsiz) throw(94); else str[len++]=0;}
 return(strlen(str));
+}
+
+// 01/07/22 - now returns total bytes read, INCLUDING eos nullbyte (which MUST be present)
+int flgetstr(char *str, int bufsiz, HDL h_fl)	// NOTE! - bufsiz has to be big enough to include terminating NULL
+{
+int	len=0, c;
+while (len<bufsiz)
+  	{
+	c=flgetc(h_fl);
+	str[len++]=(char)c;
+	if (c==0) break;
+  	if (c==NOTFND) throw(66);	// Don't expect to hit EOF without reading string EOS byte
+	}
+if (str[len-1]!=0) {sjhlog("String [%s] - no EOS nullbyte!", str); throw(67);}
+return(len);
 }
 
 

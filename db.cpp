@@ -1184,7 +1184,7 @@ void recupd(HDL h_db, RHDL rhdl, const void *data, int siz)
 	_recupd(rhdl, data, siz);
 }
 
-int recget(HDL h_db, RHDL rhdl, void *data, int maxsiz)
+int recget(HDL h_db, RHDL rhdl, void *data, int maxsiz)	// Returns NUMBYTES read
 {
 	dbactv(h_db);
 	short siz;
@@ -2078,35 +2078,31 @@ int dbreadonly(HDL db)
 
 static void dbzap(HDL db, char *name)
 {
-	if (name)
-		strcpy(name, ((DB *)db)->db_fnam);
-	((DB *)db)->db_flg |= F_TEMP;
-	dbclose(db);
+if (name) strcpy(name, ((DB *)db)->db_fnam);
+((DB *)db)->db_flg |= F_TEMP;
+dbclose(db);
 }
 
 void db_set_temp(HDL db)
-{
-	((DB *)db)->db_flg |= F_TEMP;
-}
+{((DB *)db)->db_flg |= F_TEMP;}
 
 static void dbcloseall(void)
-{
-	while ((_h_db = _dbt) != 0)
-		dbclose(_h_db);
-}
+{while ((_h_db = _dbt) != 0) dbclose(_h_db);}
 
-void dbstart(int nbufs)
+bool dbstart(int nbufs)
 {
-	_dbt = 0;
-	bfspist(nbufs);
-	dbsafe_catch = DB_IS_DIRTY;
+if (_bf_ct) return(NO);		// Nothing to do if db system already started
+_dbt = 0;
+bfspist(nbufs);
+dbsafe_catch = DB_IS_DIRTY;
+return(YES);
 }
 
 void dbstop(void)
 {
-	dbcloseall();
-	bfsprls();
-	dbsafe_catch = 0;
+dbcloseall();
+bfsprls();
+dbsafe_catch = 0;
 }
 
 /*  put rh_rec of header in to file header, where we can always find it */

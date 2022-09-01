@@ -3,7 +3,6 @@
 #include <string.h>
 #include <cstdarg>
 
-
 #include "pdef.h"
 #include "str.h"
 #include "memgive.h"

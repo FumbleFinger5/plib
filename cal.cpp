@@ -210,7 +210,7 @@ static int month(const char *m)
 {
 while (m[0]==' ') m++;
 int i, j, e;
-for (e=0; m[e]; e++) if (m[e]<=' ') break;
+for (e=0; m[e]; e++) if (m[e]<=' ' || m[e]==CHR_QTSINGLE) break;
 if (e<3) return(0);
 //printf("[%s] e=%d\r\n",m,e);
 for (i=0;i<12;i++)
@@ -225,15 +225,20 @@ return(0);
 
 short cal_parse(const char *p)
 {
+while (p[0]==' ') p++;
 if (!ISDIGIT(p[0])) return(0);
 int i, m, y, d=a2i(p,0);
 while (ISDIGIT(p[0])) p++;
 while (p[0]==' ') p++;
 m=month(p);
 if (!m) return(0);
-while (p[0]!=' ') p++;	// step over "month" (full mthname, or 1st 3 chars)
-while (p[0]==' ') p++;	// ...and spaces before "year"
-y=a2i(p,0);
+if (p[3]==CHR_QTSINGLE) y=2000+a2i(&p[4],2);
+else
+	{
+	while (p[0]!=' ') p++;	// step over "month" (full mthname, or 1st 3 chars)
+	while (p[0]==' ') p++;	// ...and spaces before "year"
+	y=a2i(p,4);
+	}
 long dttm=caljoin(y,m,d,0,0,0);
 return(short_bd(dttm));
 }

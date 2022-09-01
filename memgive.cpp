@@ -11,7 +11,7 @@
 #include "log.h"
 
 // Only define MEMLOG when troubleshooting (don't want the overrhead in normal operation)
-//#define MEMLOG 1
+#define MEMLOG 1
 
 int first_leak;
 
@@ -35,10 +35,10 @@ static DYNTBL	*log;
 static void **a;
 static int ct,c1;
 
-int do_memchk;
+//int do_memchk;
 void memchk(char *txt)
 {
-if (!do_memchk) return;
+//if (!do_memchk) return;
 #ifdef MEMLOG
 int totsiz=0;
 for (int i=0;i<ct;i++)
@@ -73,7 +73,7 @@ char *c=(char*)p;
 Uint *u=(Uint*)p;
 u[0]=siz;
 u[1]=++uniq; 
-if (uniq==40)				// set to value of first_leak as reported by dllclosedown
+if (uniq==97)				// set to value of first_leak as reported by dllclosedown
 give_first_leak(siz);	// breakpoint HERE when unique sequence number of the mem_leak is allocated
 *(int32_t*)&c[FST-4]=0x12345678;				// Put our special values before and after the address returned to app,
 *(int32_t*)&c[siz+FST]=0x87654321;				// so we can check for buffer over/underrun when it's released
@@ -508,6 +508,9 @@ int cp_ushort(const void *a, const void *b)
 int cp_int32_t(const void *a, const void *b)
 {return((*((int32_t*)a)<*((int32_t*)b))?-1:(*((int32_t*)a)>*((int32_t*)b)));}
 
+int cp_int64_t(const void *a, const void *b)
+{return((*((int64_t*)a)<*((int64_t*)b))?-1:(*((int64_t*)a)>*((int64_t*)b)));}
+
 int cp_ulong(const void *a, const void *b)
 {return((*((Ulong*)a)<*((Ulong*)b))?-1:(*((Ulong*)a)>*((Ulong*)b)));}
 
@@ -532,8 +535,8 @@ int _cdecl cp_short2(const void *a, const void *b) {return(cp_shortn((short*)a,(
 
 static int zct;
 
-TAG::TAG()
-{
+TAG::TAG()	// This is the 'implicit' TAG constructor (no parameter passed to constructor)
+{				// that gets called whenever a derived class (DYNAG or DYNTBL) is initialised
 if (log)
 	{
 	id=++zct;
@@ -548,10 +551,10 @@ id=32;						// run to cursor HERE to Find when class_leak 'id' was instantiated
 else id=NO;
 }
 
-TAG::TAG(int first)
-{
+TAG::TAG(int first)	// FIRST call is 'explicit' - invoked by leak_tracker(YES) at program start
+{		// Subsequent DYNAG/DYNTBL constructors 'implicitly' create TAGs without parameter, FOR LOGGING
 first=first; // ??????? what's this param for ?????
-log=new DYNTBL(4,cp_int32_t);
+log=new DYNTBL(8,cp_int64_t);
 id=NOTFND;
 }
 
@@ -604,15 +607,19 @@ if (start)
 	{
 	assert(logger==0);
 	logger=new TAG(YES);
-	return(0);
+	return(NO);
 	}
-
 assert(logger!=0);
-int class_leak=logger->leaks();
+static LEAK_CT lk;
+lk.classes=logger->leaks();
 SCRAP(logger);
-int fleaks=flcloseall();				// any non=closed files?
-int mem_leak=memtakeall();
-return(class_leak+fleaks+mem_leak);
-
+lk.files=flcloseall();				// any non=closed files?
+lk.memblocks=memtakeall();
+if (lk.classes!=0 || lk.files!=0 || lk.memblocks!=0)
+	{
+	printf("FirstLeak:%d Class:%d Files:%d MemBlks:%d\r\n", first_leak, lk.classes, lk.files, lk.memblocks);
+	return(-77);
+	}
+return(NO);
 }
 

@@ -3,6 +3,9 @@
 
 #include <cstdint>
 
+//#define APIKEY "66e03abd"
+#define APIKEY "c9497777"
+
 #define CACHE_FILE "/home/steve/emdb.txt"
 #define CSV_FILE "/home/steve/Cloud/OneDrive/emdb/emdb.csv"
 
@@ -54,6 +57,7 @@ int		ct;
 HDL		db,em_btr;
 RHDL	rhdl;
 struct	{char ver, fill[3]; RHDL em_rhdl, locn_upd_rhdl; char fill2[20];} hdr;
+bool	dbactivated;	// If dbstart didn't do anything in constructor, we won't dbSTOP in destructor
 void	db_open(char *fn);
 RHDL	add_or_upd_media(RHDL rh, EM_MEDIA *m, EM_MEDIA *mm, int ct); // 'ct' = number of entries in 'mm' ('m' is just a ptr to a single instance)
 void	list_media(EM_KEY *e, RHDL rh, int dets);	// If dets=True, list all slot folder+size entries

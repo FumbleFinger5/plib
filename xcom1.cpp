@@ -37,9 +37,9 @@ dbstop();
 //set_search_path(0);
 int err=NO;
 //Xecho(0);
-err=leak_tracker(NO);
+int lk=leak_tracker(NO);
 
 //sjhLog(0);	// clears 'current log file' path
-return(err);
+return(lk!=0);
 }
 

@@ -36,8 +36,11 @@ typedef	uint32_t	RHDL;	// database record handle WAS 'long''
 #define	SPACE	' '
 
 #define	CHR_HASH	35
-#define	CHR_QT1	39
+//#define	CHR_QT1	39
+#define	CHR_QTSINGLE	39
 #define	CHR_QTDOUBLE	34
+#define	BACKSLASH		92
+#define	AMPERSAND		38
 
 #define	COMMA	','
 #define	SEMICOLON	';'
@@ -155,6 +158,7 @@ int		cp_ushort(const void *p1, const void *p2);		// the values as parameters
 
 int		cp_long(const void *p1, const void *p2);
 int		cp_int32_t(const void *p1, const void *p2);
+int		cp_int86_t(const void *p1, const void *p2);
 
 int		cp_ulong(const void *p1, const void *p2);
 int _cdecl cp_ulong2(const void *a, const void *b);
@@ -163,7 +167,7 @@ int _cdecl cp_ulong4(const void *a, const void *b);
 
 int		cp_short_v(short a, short b);					// These 4 take the ACTUAL
 int		cp_ushort_v(ushort a, ushort b);				// values as parameters
-int		cp_long_v(long a, long b);
+int		cp_long_v(int32_t a, int32_t b);
 int		cp_ulong_v(Ulong a, Ulong b);
 
 

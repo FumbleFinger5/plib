@@ -1,22 +1,18 @@
 #include <stdlib.h>
-//#include <malloc.h>
 #include <string.h>
 #include <cstdarg>
-
+#include <sys/stat.h>
 
 #include "pdef.h"
-//#include "db.h"
 #include "memgive.h"
-//#include "flopen.h"
 #include "str.h"
 #include "drinfo.h"
 
 #include "dirscan.h"
 
-DIRSCAN::DIRSCAN(const char *pth, const char *msk, int flg)
+DIRSCAN::DIRSCAN(const char *pth, const char *msk)
 {
 mask=maskext=NULL;
-flag=flg;
 if (msk!=NULL)
     {
     mask=stradup(msk);
@@ -27,13 +23,14 @@ if (msk!=NULL)
         maskext=&mask[dot+1];
         }
     }
-dir = opendir(pth);
+dir = opendir(_pth=stradup(pth));
 }
 
 DIRSCAN::~DIRSCAN()
 {
 closedir(dir);
 if (mask) Scrap(mask);
+Scrap(_pth);
 }
 
 // Return offset of LAST occurrence of char in string
@@ -45,7 +42,7 @@ return(p?p-s:NOTFND);
 
 static int mask_okay(char *m, char *f) // pointers to wantedmask and filename
 {
-while (m && m[0]!='*')
+while (m[0] && m[0]!='*')
     {
     if (!f[0]) return(NO); // Can't match if we've run out of character on filename side
     if (m[0]=='?' || m[0]==f[0]) {f++; m++; continue;}          // Advance both pointers in lockstep to next chars
@@ -54,14 +51,13 @@ while (m && m[0]!='*')
 return(YES);    // If we got here the filename must match the mask
 }
 
-struct dirent* DIRSCAN::next(void)
+struct dirent* DIRSCAN::next(FILEINFO *fi)
 {
 while ((entry = readdir(dir)) != NULL)
 	{
     char n[FNAMSIZ];
-    strcpy(n,entry->d_name);
-    if (entry->d_type==DT_DIR) if ((flag&DS_DIR)==0) continue;
-    if (n[0]=='.') if ((flag&DS_DOT)==0) continue;
+    strcpy(n,entry->d_name);                                // This is just bare filename (not "pathed")
+    if (SAME2BYTES(n,".") || SAME3BYTES(n,"..")) continue;  // ignore 1 or 2 dots followed by EOS nullbyte
     if (mask)
         {
         char *ext=NULL;
@@ -71,6 +67,14 @@ while ((entry = readdir(dir)) != NULL)
         if (maskext!=NULL && ext!=NULL) if (!mask_okay(maskext,ext)) continue;
         }
     break;  // If we got here, break out of loop and return non-null "entry" ptr
+    }
+if (entry!=0 && fi!=0)  // Then copy FULL path to fi->name, along with correct filesize from stat()
+    {
+    struct stat sb;
+    stat(strfmt(fi->name,"%s/%s",_pth,entry->d_name),&sb);
+    fi->attr=entry->d_type;
+    fi->size=sb.st_size;
+    fi->dttm=sb.st_mtime;
     }
 return(entry);
 }

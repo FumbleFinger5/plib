@@ -20,15 +20,6 @@ if (!cmp) cmp=cp_short(&a->year,&b->year);
 return(cmp);
 }
 
-DYNTBL *emkludge;
-
-int _cdecl cp_em_kludge(EM_KEY *a, EM_KEY *b)		// Sort (movies in current folder) by descending user rating
-{
-int cmp=cp_short_v(b->rating,a->rating);			// 'a' and 'b' reversed, to sort on DESCENDING rating
-if (!cmp) cmp=cp_em_key(a,b);
-return(cmp);
-}
-
 int _cdecl cp_chr(char *a, char *b)
 {
 if (a[0] < b[0]) return(-1);
@@ -43,10 +34,6 @@ if (!cmp) cmp=cp_em_key(a,b);
 return(cmp);
 }
 
-
-void dbsafeclose(HDL db);
-
-
 void SMDB::db_open(char *fn)
 {
 if ((db=dbopen(fn))==NULLHDL) m_finish("Error opening %s",fn);
@@ -57,14 +44,11 @@ if ( !hdr.ver			// No version?
 btr_set_cmppart(em_btr,(PFI_v_v)cp_em_key);
 }
 
-
-
-
 SMDB::SMDB(const char *epth)
 {
 char fn[100];
 strfmt(fn,"%s/%s",epth,"SMDB.dbf");
-//sjhlog("SMDB opening [%s]\r\n",fn);
+dbactivated=dbstart(32);
 if (access(fn, F_OK ))		// mode=F_OK=0, where non-zero return value means file doesn't exist AT ALL
 	{						// mode could be either or both (R_OK|W_OK) for "User has Read / Write access"
 	Xecho("Creating database %s\r\n",fn);
@@ -125,7 +109,8 @@ memtake(uu);
 SMDB::~SMDB()
 {
 dbsafeclose(db);
-};
+if (dbactivated) dbstop();
+}
 
 void SMDB::list_media(EM_KEY *e, RHDL rh, int dets)
 {
@@ -203,7 +188,6 @@ EM_KEY	e;
 RHDL	rh;
 DYNTBL	*t=new DYNTBL(sizeof(EMTOT),(PFI_v_v) cp_chr);
 EMTOT	*ett;
-long highest=0;
 while (bkyscn_all(em_btr,&rh,&e,&again))
 	{
 	EM_MEDIA *mm = (EM_MEDIA*)zrecmem(db,rh,&sz);	// Returns a nullptr & sets *sz=0 if RHDL is zero
@@ -216,11 +200,6 @@ while (bkyscn_all(em_btr,&rh,&e,&again))
 		ett=(EMTOT*)t->get(j);
 		ett->tot += mm[i].sz;
 		ett->ct++;
-long zz=mm[i].sz / 1024;
-if (zz>100)
-{
-Xecho("Highest= %ldGb\r\n", highest=zz);
-}
 		}
 	memtake(mm);
 	}
@@ -229,9 +208,9 @@ int64_t grand=0;
 for (ett=(EMTOT*)t->get(i=0);i++ < t->ct;ett++)
 	{
 	grand+=ett->tot;
-	Xecho("Films%02d  %d films - total size %ldGb\r\n", ett->slot, ett->ct,(long)ett->tot/1024);
+	Xecho("Films%02d  %d films - total size %dGb\r\n", ett->slot, ett->ct,(int32_t)(ett->tot>>30));
 	}
-Xecho("Grand total size %ldGb\r\n",(long)(grand/1024));
+Xecho("Grand total size %dGb\r\n",(int32_t)(grand>>30));
 delete t;
 }
 
@@ -309,34 +288,6 @@ memtake(mm);
 	}
 Xecho("%7dGb  %d movies rated %2.1f\r\n", (Ulong)(total / 1024), tct, (0.1 * minrate));
 // now need to print final line saying grand total disc space + number of high-rated movies
-}
-
-void SMDB::josh_copy(DYNTBL *wanted_imdb_numbers)
-{
-int		again=NO;
-int64_t total=0;
-int		i;
-EM_KEY	e;
-RHDL	rh;
-DYNTBL	*t=new DYNTBL(sizeof(EM_KEY),(PFI_v_v) cp_em_key_rating);
-while (bkyscn_all(em_btr,&rh,&e,&again))
-	{
-	if (wanted_imdb_numbers->in(&e.imdb_num) != NOTFND)
-		{
-		int i, sz, ct;
-		int biggest_i;
-		int64_t biggest;
-		EM_MEDIA *mm = (EM_MEDIA*)zrecmem(db,rh,&sz);
-		ct=sz/sizeof(EM_MEDIA);
-		for (i=biggest=biggest_i=0;i<ct;i++) 
-			if (mm[i].sz>biggest) biggest=mm[biggest_i=i].sz;
-		if (!biggest) continue; // Eeek! - no media for requested movie!
-		Xecho("%2d  %7dMb  %s (%4.4d)\r\n", mm[biggest_i].locn, (Ulong)mm[biggest_i].sz, e.nam, e.year);
-		total+=mm[biggest_i].sz;
-//		Xecho("Running total size %dMb\r\n", (Ulong)total);
-		}
-	}
-delete t;
 }
 
 

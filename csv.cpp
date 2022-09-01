@@ -86,7 +86,6 @@ CSV_READER::CSV_READER(const char *fn)
 	sjhlog("Can't open %s", fn);
 		return;
 	}
-//else sjhlog("CSV reading %s", fn);
 	readline();
 	if (parse_first_csv_line() != 0)
 		m_finish("bad csv file");
@@ -144,7 +143,6 @@ int CSV_READER::readline(void)
 {
 int sz;
 if ((sz = flgetln(buf, 500, f)) < 10) return (NO);
-//	replace_separators(buf, ';', TAB);
 if (*(strend(buf)-1) != TAB) strendfmt(buf,"%c",TAB);
 return (YES);
 }

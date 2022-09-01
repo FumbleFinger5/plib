@@ -28,7 +28,7 @@ memmove (dir_part, fullpath, offset);		// copy directory part to passed dir_part
 return(filnam);							// return ptr to just after last separator
 }
 
-int drunlink(const char *filename)
+int drunlink(const char *filename)	// MY function returns YES if success, 0 if failed (opposite of 'unlink')
 {
 return(!unlink(filename));
 }
@@ -72,7 +72,7 @@ if (dp->d_type & 4)
 	fi->attr=FA_DIR;
 
 struct stat sb;
-stat(fi->name,&sb);
+stat(fi->name,&sb);				// MAY 2022  -  should(???) be FULLPATH, but that's not available here!!!
 
 //if (S_ISDIR(sb.st_mode)) fi->attr=FA_DIR;
 //else if (S_ISREG(sb.st_mode)) fi->attr= ??? ordinary file - pforce attr was just 0
@@ -86,16 +86,6 @@ void drscnrls(DIR *scn)
 closedir(scn);
 }
 
-#ifdef pre_Aug21
-int drinfo(const char *path, FILEINFO *pfile_info)
-{
-DIR *scn=drscnist(path);
-int	ok=drscnnxt(scn,pfile_info);
-drscnrls(scn);
-return(ok);
-}
-#endif	// pre_Aug21
-
 // Get file details, return YES = OK, NO = Fail
 int drinfo(const char *path, FILEINFO *fi)
 {
@@ -103,13 +93,11 @@ struct stat sb;
 realpath(path,fi->name);			// Fully expand passed path into passed FI structure
 if (stat(path,&sb))
 	{
-//	sjhlog("stat %s [%s] returned TRUE",path,fi->name);
 	return(NO);	// some kind of error (copied to system global 'errno')
 	}
 fi->attr=FA_SPECIAL;
 if (S_ISDIR(sb.st_mode))
 	{
-//	printf("%s is DIR\r\n",path);
 	fi->attr=FA_DIR;
 	}
 else if (S_ISREG(sb.st_mode)) fi->attr=FA_ORDINARY; // ordinary file - pforce attr is just 0
@@ -155,7 +143,7 @@ char pth[FNAMSIZ];
 drfullpath(pth,directory_path);
 
 struct stat sb;
-stat(pth,&sb);
+if (stat(pth,&sb)) return(NO);		// non-zero (always -1?) return value from stat() mean ERROR
 
 if (S_ISDIR(sb.st_mode))
 	return(YES);

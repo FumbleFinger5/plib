@@ -19,12 +19,12 @@ int   stridxc(char c,const char *s);	// Offset of LEFTMOST (if any) instance of 
 int   strridxc(char c,const char *s);	// Offset of RIGHTMOST (if any) instance of 'c' in 's'
 int	stridxs(const char *substr, const char *str);	// return offset of substr in str, or NOTFND
 int 	strinspn(const char *any_of_these, const char *in_this_string);
-void strip(char *str, char chr); // remove any & all occurences of 'chr' in 'str'
+void	strip(char *str, char chr); // remove any & all occurences of 'chr' in 'str'
 char	*strjust(char* str, int width, int type, int fillchr);
 char	*strnfmt(char*, int len, const char*,...);
 char	*strrjust(char* str, int width);
 int	strtoken(char*,char*,char*);
-char	*strtrim(char*);
+char	*strtrim(char*);				// Remove leading AND trailing white space
 char	*strxlt(char *str, char from, char to);
 
 char *vb_field(const char *rec, int n);

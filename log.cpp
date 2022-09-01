@@ -1,5 +1,6 @@
 #include <stdarg.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "pdef.h"
 #include "flopen.h"
@@ -17,7 +18,8 @@ if (!fmt) {logpath[0]=0;return;}
 char w[1024];
 if (!logpath[0])
 	{
-	strcpy(logpath,"/home/steve/SJH.LOG");
+//	strcpy(logpath,"/home/steve/SJH.LOG");
+	strfmt(logpath,"/home/%s/SJH.LOG", getenv("USER"));
 	if (!fmt[0]) return;						// If first call would just write blank line don't bother
 	}
 va_list va; va_start(va,fmt);

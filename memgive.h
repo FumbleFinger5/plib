@@ -26,6 +26,8 @@ int leaks(void);
 private:
 int	id;
 };
+extern int first_leak;
+struct LEAK_CT {int classes, files, memblocks;};
 int leak_tracker(int start);
 
 class DYNAG: public TAG

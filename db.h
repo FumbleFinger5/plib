@@ -73,7 +73,7 @@ HDL		dbopen(const char *nam);
 ushort	dbpgct(HDL db);
 RHDL	dbsetanchor(HDL db,RHDL rhdl);	// note - returns RHDL, not void
 void	db_set_temp(HDL db);			// Deletes on close
-void	dbstart(int nbufs);
+bool	dbstart(int nbufs);			// Returns NO if db already started (nothing to do), else YES if started
 void	dbstop(void);
 int		dbreadonly(HDL db);
 
@@ -83,7 +83,7 @@ int		recget(HDL db,RHDL rhdl,void *rec, int mxsz);
 void	recupd(HDL db,RHDL rhdl,const void *rec, int sz);
 
 int		zrecsizof(HDL db,RHDL rhdl);
-int		zrecget(HDL db, RHDL rhdl, void *data, int sz);
+int		zrecget(HDL db, RHDL rhdl, void *data, int sz);	// Returns number of bytes read
 RHDL	zrecadd(HDL db, const void *data, int sz);
 RHDL	zrecupd(HDL db, RHDL rhdl, const void *data, int sz);
 void*	zrecmem(HDL db, RHDL rhdl, int *sz);

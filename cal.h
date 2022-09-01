@@ -1,6 +1,6 @@
 
 #define	DAY_SECS	(24L*60L*60L)
-#define	ONE_DAY		86400L		// Number of seconds in 24 hours
+#define	ONE_DAY		86400		// Number of seconds in 24 hours
 #define	BD1980		3652		// (short) binary date value of 01/01/1980
 #define	BIGDATE		21915		// Latest (short) date we accept = 01/01/2030 (latest we COULD accept=24855 = 19/01/38)
 #define	BIGDATL		(BIGDATE*ONE_DAY)
@@ -33,7 +33,6 @@ struct _TMR
 	long	secs;
 	int		ticks;
 	};
-
 
 int 	calerr(void);
 char	*calfmt(char *str,const char *ctl,long cal);

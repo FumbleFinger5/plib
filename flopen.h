@@ -48,5 +48,6 @@ long	flseek(HDL,long pos,int mode);	// mode 0/1/2 = from BEG/CUR/END
 void	flnam_env(char *p, const char *fn, const char *envstr);
 
 int flgets(char *str, int bufsiz, HDL h);	// bufsiz must be big enough for terminating NULL
+int flgetstr(char *str, int bufsiz, HDL h);	// bufsiz must be big enough for terminating NULL
 
 #endif
