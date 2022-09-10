@@ -30,7 +30,11 @@ typedef	uint32_t	RHDL;	// database record handle WAS 'long''
 
 //	Some useful macros
 //	General defines used almost everywhere
+
+#ifndef ABS
 #define	ABS(x) 	((x)<0?-(x):(x))
+#endif
+
 #define	BKSP	8
 #define	BIGLONG	0x7fffffff
 #define	SPACE	' '
@@ -57,8 +61,15 @@ typedef	uint32_t	RHDL;	// database record handle WAS 'long''
 #define	ISDIGIT(d)	(('0'<=(d))&&((d)<='9'))
 #define	LNFEED   '\n'		// 10
 #define	LT       (-1)
+
+#ifndef MAX
 #define	MAX(a,b) (((a)>(b))?(a):(b))
+#endif
+#ifndef MIN
 #define	MIN(a,b) (((a)<=(b))?(a):(b))
+#endif
+
+
 #define	NULLPTR	((void *)0)		// use to pass null pointer to funcs
 #define	NULLHDL	((HDL)0)
 #define	NULLRHDL	((RHDL)0)

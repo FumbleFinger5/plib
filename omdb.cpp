@@ -1,6 +1,6 @@
-#include <QApplication>
-#include <QTime>
-#include <QSettings>
+//#include <QApplication>
+//#include <QTime>
+//#include <QSettings>
 
 #include <unistd.h>
 #include <sys/wait.h>
@@ -23,8 +23,8 @@
 #include "omdb.h"
 #include "csv.h"
 #include "dirscan.h"
-
-
+#include "parm.h"
+#define PARM_FN "/home/steve/.config/Softworks/SMDB.conf"
 
 #define CURLE "2>/dev/null"
 //#define CURLE ""
@@ -443,6 +443,7 @@ for (i=0;i<ct;i++)
 flclose(f);
 }
 
+#ifdef USE_QSETTINGS
 static void get_conf_path(QSettings *qs, char *fn, const char *ext)
 {
 char xx[16];
@@ -452,14 +453,37 @@ if (!fn[0]) {sjhlog("No configured [%s] for OMDB.%s",xx,ext); throw(102);}
 if (fn[strlen(fn)-1]!='/') strcat(fn,"/");
 strendfmt(fn,"OMDB.%s",ext);
 }
+#else
+static void get_conf_path(PARM *pm, char *fn, const char *ext)
+{
+char xx[16];
+strfmt(xx,"%s_path",ext);
+strcpy(fn,pm->get(xx));
+if (!fn[0]) {sjhlog("No configured [%s] for OMDB.%s",xx,ext); throw(102);}
+if (fn[strlen(fn)-1]!='/') strcat(fn,"/");
+strendfmt(fn,"OMDB.%s",ext);
+}
+#endif
 
+static void grab(void) {;}
 
 OMDB::OMDB(void)
 {
 char fn[256];
-QSettings qs;
-get_conf_path(&qs, fn, "dbf");
-get_conf_path(&qs, bk_fn, "bck");
+grab();
+#ifdef USE_QSETTINGS
+    {
+    QSettings qs;
+    get_conf_path(&qs, fn, "dbf");
+    get_conf_path(&qs, bk_fn, "bck");
+    }
+#else
+    {
+    PARM parm(PARM_FN);
+    get_conf_path(&parm, fn, "dbf");
+    get_conf_path(&parm, bk_fn, "bck");
+    }
+#endif
 dbactivated=dbstart(32);
 if (access(fn, F_OK ))		// mode=F_OK=0, where non-zero return value means file doesn't exist AT ALL
 	{						// mode could be either or both (R_OK|W_OK) for "User has Read / Write access"
@@ -731,13 +755,32 @@ DYNAG t(sizeof(XDT));                       // MOST RECENT bckN comes FIRST here
 make_list_of_older_backups(pth, &t);
 strfmt(ext,"/OMDB.bck%c",tidy_up_older_backups(&t, pth, dttm)); // get *.bckN that *.bck is renamed to
 strfmt(cmd,"mv \"%s\" \"%s\"",bk_fn,pth);  // Actually do rename of *.bck to *.bckN (after choosing N)
-int ret=system(cmd);
+#ifdef USE_QSETTINGS
+bool ok = (system(cmd)==0); // ret = zero = no error
+#else
+int statusflag, id = fork();
+if (id == 0)  // then it's the child process
+    execlp("/bin/sh","/bin/sh", "-c", cmd, (char *)NULL);
+wait(&statusflag);  // wait(&status) until child returns, else it might not be ready to use results
+bool ok=(statusflag==0);
+if (!ok) {printf("Error moving %s to %s",bk_fn,pth); throw(88);}
+#endif
 }
 
 void OMDB::backup_if_needed(void)
 {
-QSettings qs;
-if (*qs.value("autobackup").toString().toStdString().c_str()=='n') {sjhlog("No AutoBCK"); return;}
+#ifdef USE_QSETTINGS
+    {
+    QSettings qs;
+    if (*qs.value("autobackup").toString().toStdString().c_str()=='n') {sjhlog("No AutoBCK"); return;}
+    }
+#else
+    {
+    PARM parm(PARM_FN);
+    int no_bck=*parm.get("autobackup");
+    if (TOLOWER(no_bck)=='n') {sjhlog("No AutoBCK"); return;}
+    }
+#endif
 int32_t db_dttm, bk_dttm=0;
 FILEINFO fi;
 if (!drinfo(dbfnam(db), &fi)) throw(99);

@@ -472,7 +472,8 @@ static int next_delimiter(int chr, const char *str)
 int p;
 if ((p=stridxc((char)chr,str))==NOTFND)
 	{
-	m_finish("Internal error 800 finding CHR(%d)",chr);
+throw 22;
+//	m_finish("Internal error 800 finding CHR(%d)",chr);
 	}
 return(p);
 }
@@ -486,7 +487,8 @@ int len=0;
 while (n>=0)
 	{
 	len=next_delimiter('\t',rec);
-	if (len>=sizeof(fld)) m_finish("Internal error 801 field too long [%s]",prv);
+//	if (len>=sizeof(fld)) m_finish("Internal error 801 field too long [%s]",prv);
+throw 22;
 	if (n--) rec+=(len+1); else break;
 	if (!*rec) return(0);	// Added check to avoid going past end, 7/2/19
 //	if (!*rec) {len=0;break;}	// Feb 2022 - return empty string, not nullptr
