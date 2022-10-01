@@ -26,9 +26,40 @@ while (*a) if (*a==COMMA) break; else a++;
 return(a);
 }
 
+static void sjhlog_fixlen(const char *txt, const char *n, int l)
+{
+char w[20];
+strfmt(w,"%s[%c%d.%ds]",txt,'%',l,l);
+sjhlog(w,n);
+}
+
+// Passed NAMPTR last.name="(voice)"  Step it back to immediately preceding REAL surname
+static void step_back_over_voice(NAMPTR *n)
+{
+char *f=n->fore.name;			// ptr -> forename
+char *s=&f[n->fore.len-1];	// initially ptr -> forename last char, will become ptr -> surname
+while (*s==SPACE) s--;			// step back over any trailing spaces
+char *e=s;							// ptr -> last char of forename (will become last char of lastname)
+while (s!=f && *(s-1)!=SPACE) s--;	// step back to start of 'real' surname
+if (s!=f)
+	{
+	int l=s-f;
+	while (l>0 && f[l-1]==SPACE) l--;
+	n->fore.len=l;
+	}
+n->last.name=s;
+n->last.len=e-s+1;
+//sjhlog("flen=%d slen=%d",n->fore.len,n->last.len);
+//sjhlog_fixlen("f",n->fore.name,n->fore.len);
+//sjhlog_fixlen("s",n->last.name,n->last.len);
+}
+
 // Fill in passed NAMPTR with up to 5 forename+lastnane  pointer pairs
 static void fill_np(char *a, NAMPTR *np)
 {
+//char *aa=a;
+//static int again=NO;
+
 int n,e, sp;
 for (n=0;n<5;n++)
     {
@@ -41,6 +72,14 @@ for (n=0;n<5;n++)
     np[n].fore.len = sp;
     a=np[n].last.name + np[n].last.len;
     while (*a==COMMA || *a==SPACE) a++;
+
+	if (np[n].last.len==7 && memcmp(np[n].last.name,"(voice)",7)==0)
+		{
+//		sjhlog("aa[%s]",aa);
+//		sjhlog_fixlen("F",np[n].fore.name,np[n].fore.len);
+		step_back_over_voice(&np[n]);
+		}
+
     }
 }
 
