@@ -1,6 +1,10 @@
-//#include <QApplication>
-//#include <QTime>
-//#include <QSettings>
+#define USE_QSETTINGS YES
+
+#ifdef USE_QSETTINGS
+#include <QApplication>
+#include <QTime>
+#include <QSettings>
+#endif 
 
 #include <unistd.h>
 #include <sys/wait.h>
@@ -212,7 +216,6 @@ return(cmp);
 void OMDB::fix2(void)
 {
 int nk=btrnkeys(om_btr);
-sjhlog("nkeys=%d",nk);
 DYNTBL t(sizeof(FIX2),(PFI_v_v)cp_fix2);
 FIX2 fx2, *ff;
 RHDL rh;
@@ -227,11 +230,9 @@ while (bkyscn_all(om_btr,&rh,&imdb_num,&again))
     t.put(&fx2);
     }
 short prv=0;
-sjhlog("tbl ct=%d",t.ct);
 for (int i=0;i<t.ct;i++)
     {
     ff=(FIX2*)t.get(i);
-    sjhlog("E:%d (%d) I:%d",ff->emdb_num,i+1,ff->imdb_num);
 #ifdef FIXING
 om.imdb_num=ff->imdb_num;
 if (!bkysrch(om_btr,BK_EQ,&rh,&om.imdb_num)) {Sjhlog("Can't delete imdb_num:%d",om.imdb_num); return;}

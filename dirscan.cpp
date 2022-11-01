@@ -7,6 +7,7 @@
 #include "memgive.h"
 #include "str.h"
 #include "drinfo.h"
+#include "log.h"
 
 #include "dirscan.h"
 
@@ -24,6 +25,7 @@ if (msk!=NULL)
         }
     }
 dir = opendir(_pth=stradup(pth));
+if (dir==NULL) sjhlog("opendir(%s) failed!",_pth);
 }
 
 DIRSCAN::~DIRSCAN()
