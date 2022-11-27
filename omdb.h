@@ -3,6 +3,8 @@
 
 #include <cstdint>
 
+extern int omdb_read_only;
+
 struct RHNM {RHDL rh; char *nm;};
 
 struct	OM_KEY
@@ -26,13 +28,13 @@ bool upd(EM_KEY1 *e);				// ONLY update moviename + rating + seen + emdb_num + f
 bool del(int32_t imdb_num);		// Return Yes/No for Success/Failure
 const char *get_notes(int32_t imdb_num);
 void put_notes(int32_t imdb_num, const char *txt);
-void backup(void);
 void restore(void);
 void backup_if_needed(void);
 void fix(int32_t imdb_num, short eno);
 void fix2(void);
 
 private:
+void backup(void);
 void	db_open(char *fn);
 void	em2om(OM_KEY *om, EM_KEY1 *em);
 void	om2em(EM_KEY1 *em, OM_KEY *om);
@@ -52,6 +54,29 @@ DYNTBL *rhnm=NULL;
 bool	dbactivated;	// If dbstart didn't do anything in constructor, we won't dbSTOP in destructor
 char	bk_fn[256];
 };
+
+struct	OM1_KEY
+	{
+	int32_t	imdb_num; 
+	RHDL		notes;
+	char		rating;
+	};
+class OMDB1 {
+public:
+OMDB1(void);						// Constructor used by app progs
+~OMDB1();
+int get_rating(int32_t imdb_num);
+void put_rating(int32_t imdb_num, int rating);
+const char *get_notes(int32_t imdb_num);
+void put_notes(int32_t imdb_num, const char *txt);
+bool get_om1(int32_t imdb_num, OM1_KEY *om1);
+private:
+void	db_open(char *fn);
+HDL	db,om_btr;
+struct	{char ver, fill[3]; RHDL om_rhdl, Xnames_rhdl; char fill2[20];} hdr;
+bool	dbactivated;	// If dbstart didn't do anything in constructor, we won't dbSTOP in destructor
+};
+
 
 class USRTXT {
 public:

@@ -33,6 +33,8 @@
 #define CURLE "2>/dev/null"
 //#define CURLE ""
 
+int omdb_read_only;
+
 static void fgets_no_lf(char *buf, int maxct, FILE *f)
 {
 fgets(buf, maxct-1, f);
@@ -444,13 +446,17 @@ for (i=0;i<ct;i++)
 flclose(f);
 }
 
+#ifdef USE_QSETTINGS
 static void get_conf_path(QSettings *qs, char *fn, const char *ext)
 {
 char xx[16];
 strfmt(xx,"%s_path",ext);
-#ifdef USE_QSETTINGS
 strcpy(fn, (const char*)qs->value(xx).toString().toStdString().c_str());
 #else
+static void get_conf_path(PARM *pm, char *fn, const char *ext)
+{
+char xx[16];
+strfmt(xx,"%s_path",ext);
 strcpy(fn,pm->get(xx));
 #endif
 if (!fn[0]) {sjhlog("No configured [%s] for OMDB.%s",xx,ext); throw(102);}
@@ -458,12 +464,14 @@ if (fn[strlen(fn)-1]!='/') strcat(fn,"/");
 strendfmt(fn,"OMDB.%s",ext);
 }
 
+
+
 static void grab(void) {;}
 
 OMDB::OMDB(void)
 {
 char fn[256];
-grab();
+//grab();
 #ifdef USE_QSETTINGS
     {
     QSettings qs;
@@ -762,18 +770,20 @@ if (!ok) {printf("Error moving %s to %s",bk_fn,pth); throw(88);}
 
 void OMDB::backup_if_needed(void)
 {
+if (dbreadonly(db)) return;
+int no_bck;
 #ifdef USE_QSETTINGS
     {
     QSettings qs;
-    if (*qs.value("autobackup").toString().toStdString().c_str()=='n') {sjhlog("No AutoBCK"); return;}
+    no_bck=*qs.value("autobackup").toString().toStdString().c_str();
     }
 #else
     {
     PARM parm(PARM_FN);
-    int no_bck=*parm.get("autobackup");
-    if (TOLOWER(no_bck)=='n') {sjhlog("No AutoBCK"); return;}
+    no_bck=*parm.get("autobackup");
     }
 #endif
+if (TOLOWER(no_bck)=='n') {sjhlog("No AutoBCK"); return;}
 int32_t db_dttm, bk_dttm=0;
 FILEINFO fi;
 if (!drinfo(dbfnam(db), &fi)) throw(99);
@@ -784,6 +794,132 @@ if (bk_dttm!=0) rename_backups(db_dttm);
 backup();
 }
 
+
+
+void OMDB1::db_open(char *fn)
+{
+if ((db=dbopen(fn))==NULLHDL) m_finish("Error opening %s",fn);
+recget(db,dbgetanchor(db),&hdr,sizeof(hdr));						// Read anchor record
+if ( !hdr.ver || (om_btr=btropen(db,hdr.om_rhdl))==NULLHDL)
+	m_finish("Error reading %s",fn);
+}
+
+OMDB1::OMDB1(void)
+{
+char fn[256];
+#ifdef USE_QSETTINGS
+    {
+    QSettings qs;
+    get_conf_path(&qs, fn, "db1");
+    }
+#else
+    {
+    PARM parm(PARM_FN);
+    get_conf_path(&parm, fn, "db1");
+    }
+#endif
+dbactivated=dbstart(32);
+int prv=dbsetlock(NO);
+if (access(fn, F_OK ))		// mode=F_OK=0, where non-zero return value means file doesn't exist AT ALL
+	{						// mode could be either or both (R_OK|W_OK) for "User has Read / Write access"
+	Xecho("Creating database %s\r\n",fn);
+	if (!dbist(fn) || (db=dbopen(fn))==NULLHDL) goto err;
+	memset(&hdr,0,sizeof(hdr));
+	hdr.ver=1;
+	hdr.om_rhdl=btrist(db,DT_ULONG,sizeof(int32_t));
+	dbsetanchor(db,recadd(db,&hdr,sizeof(hdr)));
+	dbsafeclose(db);
+	}
+db_open(fn);
+dbsetlock(prv);
+//sjhlog("omdb1 nkeys=%d",btrnkeys(om_btr));
+return;
+err:
+m_finish("Error creating %s",fn);
+}
+
+OMDB1::~OMDB1()
+{
+dbsafeclose(db);
+if (dbactivated) dbstop();
+}
+
+bool OMDB1::get_om1(int32_t imdb_num, OM1_KEY *om1)
+{
+RHDL rh;
+if (!bkysrch(om_btr,BK_EQ,&rh,&imdb_num)) return(NO);
+if (recget(db,rh,om1,sizeof(OM1_KEY))!=sizeof(OM1_KEY) || om1->imdb_num!=imdb_num) throw(88);
+return(YES);
+}
+
+int OMDB1::get_rating(int32_t imdb_num)
+{
+OM1_KEY om1;
+if (get_om1(imdb_num,&om1)) return(om1.rating);
+return(0);
+}
+
+void OMDB1::put_rating(int32_t imdb_num, int rating)
+{
+OM1_KEY om1;
+if (get_om1(imdb_num,&om1))
+    {
+    RHDL rh;    // have to search AGAIN to get the RH value TODO - add option for get_om1() to do that
+    bkysrch(om_btr,BK_EQ,&rh,&imdb_num);    // CAN'T fail, 'cos it just worked on precediing line!
+    om1.rating=rating;
+    recupd(db,rh,&om1,sizeof(OM1_KEY));
+    }
+else
+    {
+    memset(&om1,0,sizeof(OM1_KEY));
+    om1.imdb_num=imdb_num;
+    om1.rating=rating;
+    bkyadd(om_btr,recadd(db,&om1,sizeof(OM1_KEY)),&om1.imdb_num);
+    }
+}
+
+const char* OMDB1::get_notes(int32_t imdb_num)
+{
+OM1_KEY om1;
+if (!get_om1(imdb_num,&om1) || om1.notes==NULLRHDL) return((const char*)memgive(1));
+int sz;
+const char *txt=(const char*)zrecmem(db,om1.notes,&sz);
+if (sz==0 || txt[sz-1]!=0) throw(81);   // Notes record must be non-zero length, terminated by nullbyte
+return(txt);
+}
+
+void OMDB1::put_notes(int32_t imdb_num, const char *txt)
+{
+OM1_KEY om1;
+int sz = strlen(txt);
+if (!get_om1(imdb_num,&om1)) // There's not YET a user record for this inum
+    {
+    if (sz)      // so only add a record if notes exist
+        {
+        memset(&om1,0,sizeof(OM1_KEY));
+        om1.imdb_num=imdb_num;
+        om1.notes=zrecadd(db,txt,sz+1);
+        bkyadd(om_btr,recadd(db,&om1,sizeof(OM1_KEY)),&om1.imdb_num);
+        }
+    return;
+    }
+RHDL rh;
+bkysrch(om_btr,BK_EQ,&rh,&om1.imdb_num);    // CAN'T fail, 'cos it just worked on precediing call!
+if (om1.notes==NULLRHDL)
+    {
+    if (sz==0) return;
+    om1.notes=zrecadd(db,txt,sz+1);
+    }
+else
+    {
+    if (sz==0) {recdel(db,om1.notes); om1.notes=NULLRHDL;}
+    else om1.notes=zrecupd(db,om1.notes,txt,sz+1);
+    }
+recupd(db,rh,&om1,sizeof(OM1_KEY));
+}
+
+
+
 USRTXT::USRTXT(int32_t num)
 {
 imdb_num=num;
@@ -791,14 +927,24 @@ imdb_num=num;
 
 const char* USRTXT::get(void)    // TODO populate rest of 'e' (name,year) for caller to use in window title
 {
+if (omdb_read_only)
+    {
+    OMDB1 omdb1;
+    return(txt=omdb1.get_notes(imdb_num));
+    }
 OMDB omdb;
-txt=omdb.get_notes(imdb_num);
-return(txt);
+return(txt=omdb.get_notes(imdb_num));
 }
 
 void USRTXT::put(const char *t)
 {
-if (strcmp(t,txt))                  // ONLY update if txt has changed!
+if (!strcmp(t,txt)) return;                  // ONLY update if txt has changed!
+if (omdb_read_only)
+    {
+    OMDB1 omdb1;
+    omdb1.put_notes(imdb_num,t);
+    }
+else
     {
     OMDB omdb;
     omdb.put_notes(imdb_num,t);

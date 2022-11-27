@@ -76,4 +76,18 @@ private:
 PFI_v_v	cp;
 };
 
+class NAMBAG	// trivial class to uniquely store (not too many) text strings
+{
+public:
+NAMBAG();
+~NAMBAG();
+int put(const char *s);
+const char *get(int i);
+private:
+DYNAG *d;
+int sz=0;
+char *ad=0;
+};
+
+
 #endif

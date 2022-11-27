@@ -349,7 +349,7 @@ return (char *)&s[strlen(s)];
 }
 
 
-char *stradup(const char *s)
+char *stradup(const char *s)	// NOT same as stdrcpy() - uses different memory allocator
 {
 return (strcpy((char*)memgive(strlen(s)+1),s));
 }

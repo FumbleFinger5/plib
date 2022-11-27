@@ -623,3 +623,32 @@ if (lk.classes!=0 || lk.files!=0 || lk.memblocks!=0)
 return(NO);
 }
 
+
+NAMBAG::NAMBAG()
+{
+d=new DYNAG(sizeof(int16_t));
+}
+
+NAMBAG::~NAMBAG()
+{
+memtake(ad);
+delete d;
+}
+
+int NAMBAG::put(const char *s)  // find or add 's' and return its subscript
+{
+int i;
+for (i=0;i<d->ct;i++)
+    if (!strcmp(s,get(i))) return(i); // string already present
+d->put(&sz);
+int len=strlen(s)+1;
+ad=(char*)memrealloc(ad,sz+len);
+strcpy(&ad[sz],s);
+sz+=len;
+return(i);  // returns subscript of newly-appended final string
+}
+
+const char*NAMBAG::get(int i)   // return ptr to stored string element 'i'
+{
+return(&ad[*((int16_t*)d->get(i))]);
+}
