@@ -444,27 +444,19 @@ for (i=0;i<ct;i++)
 flclose(f);
 }
 
-#ifdef USE_QSETTINGS
 static void get_conf_path(QSettings *qs, char *fn, const char *ext)
 {
 char xx[16];
 strfmt(xx,"%s_path",ext);
+#ifdef USE_QSETTINGS
 strcpy(fn, (const char*)qs->value(xx).toString().toStdString().c_str());
-if (!fn[0]) {sjhlog("No configured [%s] for OMDB.%s",xx,ext); throw(102);}
-if (fn[strlen(fn)-1]!='/') strcat(fn,"/");
-strendfmt(fn,"OMDB.%s",ext);
-}
 #else
-static void get_conf_path(PARM *pm, char *fn, const char *ext)
-{
-char xx[16];
-strfmt(xx,"%s_path",ext);
 strcpy(fn,pm->get(xx));
+#endif
 if (!fn[0]) {sjhlog("No configured [%s] for OMDB.%s",xx,ext); throw(102);}
 if (fn[strlen(fn)-1]!='/') strcat(fn,"/");
 strendfmt(fn,"OMDB.%s",ext);
 }
-#endif
 
 static void grab(void) {;}
 

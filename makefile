@@ -1,12 +1,12 @@
 TARGET = libplib.a
 #COMP = g++
 COMP = clang
-#CFLAGS = -I../mylib -ggdb
+#BUG = -ggdb
 CFLAGS = -I../mylib  -isystem /usr/include/x86_64-linux-gnu/qt5 \
    -isystem /usr/include/x86_64-linux-gnu/qt5/QtCore \
    -isystem /usr/include/x86_64-linux-gnu/qt5/QStandardItemModel \
    -isystem /usr/include/x86_64-linux-gnu/qt5/QSettings \
-   -isystem  /usr/include/x86_64-linux-gnu/qt5/QtWidgets -ggdb  -fPIE 
+   -isystem  /usr/include/x86_64-linux-gnu/qt5/QtWidgets  -fPIE 
 
 # target: prerequisites - the rule head
 # $@  means the target
@@ -27,7 +27,7 @@ $(TARGET): str.o memgive.o \
 	ar rcs $@ $^
 
 %.o: %.cpp %.h
-	$(COMP) $(CFLAGS) -c -o $@ $<  
+	$(COMP) $(CFLAGS) $(BUG) -c -o $@ $<  
 
 clean:
 	rm -f *.o *.a $(TARGET)
