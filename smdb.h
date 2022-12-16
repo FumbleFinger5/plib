@@ -9,8 +9,10 @@
 #define CACHE_FILE "/home/steve/emdb.txt"
 #define CSV_FILE "/home/steve/Cloud/OneDrive/emdb/emdb.csv"
 
-struct	EM_KEY {char nam[60]; short year, emdb_num; int32_t imdb_num; char rating;}; // Each BTR entry includes RHDL (maybe NULL) to 'mct' MEDIA entries
-struct	EM_KEY1 {EM_KEY e; char director[30], cast[60]; short added, seen, filesz, runtime;};
+#pragma pack(push, 1)
+struct	EM_KEY {char nam[60]; short year, emdb_num; int32_t imdb_num; char rating; uchar seen_hr, unused[2];}; // Each BTR entry includes RHDL (maybe NULL) to 'mct' MEDIA entries
+struct	EM_KEY1 {EM_KEY e; char director[30], cast[60]; short added, seen, filesz, runtime; char Unused[2];};
+#pragma pack(pop)
 
 #pragma pack(push, 1)
 struct	EM_MEDIA {char locn, fct, dct, dvd; int64_t sz;};		// The (variable length) array of media locations is in no particular sequence!!!

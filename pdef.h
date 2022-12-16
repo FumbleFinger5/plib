@@ -6,6 +6,9 @@
 #define _cdecl
 #define _stdcall
 
+typedef unsigned char uchar;
+
+
 #define Xecho printf
 #define stricmp strcasecmp
 #define SetErrorText printf

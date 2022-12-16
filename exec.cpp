@@ -76,7 +76,7 @@ if (f==NULL) throw(77);
 DYNAG *t=f2tbl(f);
 int err=pclose(f);
 if (err<0) {sjhlog("\ncommand [%s] failed with %d\n",cmd,err); throw(77);}
-if (err) sjhlog("\ncommand [%s] returned exit code:%d\n",cmd,err);
+//if (err) sjhlog("\ncommand [%s] returned exit code:%d\n",cmd,err); // Esc / WndClose / etc - don't care
 return(t);
 }
 

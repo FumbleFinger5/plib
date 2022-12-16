@@ -22,8 +22,8 @@ HDL f=flopen(path=stradup(pth),"R");
 if (f)
     {
     int len, eq;
-    char s[FNAMSIZ];
-    while ((len=flgetln(s,FNAMSIZ,f))>=0)
+    char s[1024];
+    while ((len=flgetln(s,1024,f))>=0)
         {
         if ((eq=stridxc('=',s))<1) continue;
         s[eq]=0;
@@ -37,11 +37,12 @@ if (f)
 
 PARM::~PARM()
 {
-if (upd)
+int i;
+char s[1024], *v, **vv;
+/*if (upd)
     {
     HDL f=flopen(path,"w");
-    char s[FNAMSIZ], *v, **vv;
-    for (int i=0;i<nam->ct;i++)
+    for (i=0;i<nam->ct;i++)
         {
         vv=(char**)val->get(i);
         if (vv)
@@ -56,7 +57,18 @@ flputs("\n",f);
             }
         }
     flclose(f);
+    }*/
+
+for (i=0;i<val->ct;i++)
+    {
+    vv=(char**)val->get(i);
+    if (vv)
+        {
+        v=*vv;
+        memtake(v);
+        }
     }
+
 Scrap(path);
 SCRAP(nam);
 SCRAP(val);
@@ -83,7 +95,7 @@ if (((str1!=NULL) && str1[0]) || ((str2!=NULL) && str2[0])) return(YES); // diff
 return(NO); // No difference - one or both strings are NULLPTR, and neither points to a non-null string
 }
 
-void PARM::set(const char *name, const char *value)
+/*void PARM::set(const char *name, const char *value)
 {
 int i, fnd;
 const char **vv;
@@ -109,4 +121,4 @@ if (!fnd)
     val->put(&vn);
     }
 upd=YES;
-}
+}*/

@@ -11,6 +11,7 @@
 #include "flopen.h"
 #include "str.h"
 #include "drinfo.h"
+#include "log.h"
 
 static void bkysetpos(int last);
 static short bkynxtkey(RHDL *rhdl, void *key);

@@ -1,12 +1,12 @@
 TARGET = libplib.a
-#COMP = g++
-COMP = clang
-# BUG = -ggdb
+#COMP = gcc
+COMP = clang++
+#BUG = -ggdb
 CFLAGS = -I../mylib  -isystem /usr/include/x86_64-linux-gnu/qt5 \
    -isystem /usr/include/x86_64-linux-gnu/qt5/QtCore \
    -isystem /usr/include/x86_64-linux-gnu/qt5/QStandardItemModel \
    -isystem /usr/include/x86_64-linux-gnu/qt5/QSettings \
-   -isystem  /usr/include/x86_64-linux-gnu/qt5/QtWidgets  -fPIE 
+   -isystem  /usr/include/x86_64-linux-gnu/qt5/QtWidgets  -fPIC 
 
 # target: prerequisites - the rule head
 # $@  means the target

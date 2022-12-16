@@ -8,7 +8,7 @@ char  *stradup(const char *s);
 char  *strfmt(char *str ,const char *fmt,...);
 char  *_strfmt(char*s1 ,const char*s2,va_list va);
 char	*_strfmt(char *str,const char *fmt,va_list);
-void	strendfmt(char *str, const char *fmt,...);
+char	*strendfmt(char *str, const char *fmt,...);
 char	*_strnfmt(char*,int, const char*, va_list);
 char	*strend(const char *str);
 char	*strdel(char *str, int ct);				// delete 'ct' chars from front of 'str'

@@ -7,15 +7,19 @@ extern int omdb_read_only;
 
 struct RHNM {RHDL rh; char *nm;};
 
+#pragma pack(push, 1)
 struct	OM_KEY
 	{
 	RHDL		nam,					// locates a single record (TODO - 2 tab-separated names = MINE + IMDB's)
 				director, cast,	// locates an ARRAY of rhdl's - each locating a single 'person-name' record
 				plot, notes;		// 'plot' UNUSED
-	int32_t	imdb_num; 
+	int32_t		imdb_num; 
 	short		year, emdb_num, added, seen, filesz, runtime;
 	char		rating;
+	uchar		seen_hr, unused[2];
 	};
+#pragma pack(pop)
+
 
 class OMDB {
 public:
@@ -30,8 +34,9 @@ const char *get_notes(int32_t imdb_num);
 void put_notes(int32_t imdb_num, const char *txt);
 void restore(void);
 void backup_if_needed(void);
-void fix(int32_t imdb_num, short eno);
-void fix2(void);
+//void fix(int32_t imdb_num, short eno);
+//void fix2(void);
+//void test(void);
 
 private:
 void backup(void);
@@ -78,7 +83,7 @@ bool	dbactivated;	// If dbstart didn't do anything in constructor, we won't dbST
 };
 
 
-class USRTXT {
+class USRTXT {	// Get/Put User Notes (steve's in main OMDB.dbf, others in their personal OMDB.db1)
 public:
     USRTXT(int32_t imdb_num);
     const char *get(void);

@@ -82,6 +82,7 @@ HDL	h_fl;
 f_new=f_new_if_missing=f_buf=f_mv_eof=flag=NO;
 //_fmode=_O_BINARY;
 iomode=READ;			// Assume 'r' (ReadWrite), or 'R' (ReadOnly)
+//if (_flopen_status!=2) sjhlog("DB31 mode=[%s]",mode);
 switch(*mode)			// maybe it's worth using TOLOWER(*mode) here...
 	{
 	case 'a': iomode=WRITE; f_mv_eof=f_new_if_missing=YES; break;
@@ -119,10 +120,11 @@ H_FL->lst_rd_byte = NOTFND;
 if	(f_buf) H_FL->fbuf=(char *)memgive(FBUFSZ);
 if (f_mv_eof) dosseek(H_FL->fd, 0L, FROMEND);
 
-{
-if (!open_file_handles) open_file_handles=new DYNTBL(sizeof(HDL),(PFI_v_v)cp_ulong);
-open_file_handles->put(&h_fl);
-}
+if (_flopen_status!=2)
+	{
+	if (!open_file_handles) open_file_handles=new DYNTBL(sizeof(HDL),(PFI_v_v)cp_ulong);
+	open_file_handles->put(&h_fl);
+	}
 
 return(h_fl);
 }
@@ -311,7 +313,7 @@ while (len<bufsiz)
 	if (c==0) break;
   	if (c==NOTFND) throw(66);	// Don't expect to hit EOF without reading string EOS byte
 	}
-if (str[len-1]!=0) {sjhlog("String [%s] - no EOS nullbyte!", str); throw(67);}
+if (str[len-1]!=0) {Sjhlog("String [%s] - no EOS nullbyte!", str); throw(67);}
 return(len);
 }
 

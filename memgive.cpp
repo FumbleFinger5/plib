@@ -11,7 +11,7 @@
 #include "log.h"
 
 // Only define MEMLOG when troubleshooting (don't want the overrhead in normal operation)
-#define MEMLOG 1
+//#define MEMLOG 1
 
 int first_leak;
 
@@ -57,7 +57,6 @@ char w[128];
 strfmt(w,"Open Files:%ld, Objects:%ld, MemUsed:%ld",open_file_handles_ct(),log->ct,totsiz);
 sjhlog("%s %s",txt,w);
 #endif
-//int rc=_heapchk();
 }
 
 void give_first_leak(int sz)	// breakpoint HERE after setting sought uniq value 10 lines down...
@@ -73,7 +72,7 @@ char *c=(char*)p;
 Uint *u=(Uint*)p;
 u[0]=siz;
 u[1]=++uniq; 
-if (uniq==97)				// set to value of first_leak as reported by dllclosedown
+if (uniq==5)				// set to value of first_leak as reported by dllclosedown
 give_first_leak(siz);	// breakpoint HERE when unique sequence number of the mem_leak is allocated
 *(int32_t*)&c[FST-4]=0x12345678;				// Put our special values before and after the address returned to app,
 *(int32_t*)&c[siz+FST]=0x87654321;				// so we can check for buffer over/underrun when it's released
@@ -170,9 +169,9 @@ while (ct)
 	{
 #ifdef MEMLOG
 		{
-		int *pi=(int*)a[ct-1];
+		int32_t *pi=(int32_t*)a[ct-1];
 //		int sz=pi[0];				// get the (app-requested) allocated block size,
-		int sq=pi[1];				// - unique sequence number, (of this mem_leak)
+		int32_t sq=pi[1];				// - unique sequence number, (of this mem_leak)
 		if (!first_leak)
 			first_leak=sq;			// LINK01 
 //		char *data=(char*)&pi[3];	// - and 'pointer to app-perceived data area'
@@ -465,13 +464,13 @@ for (int i=0;i<add->ct;i++) put(add->get(i));
 }
 
 
-void swap_data(void *a, void *b, int sz)
+void swap_data(void *ad1, void *ad2, int sz)
 {
 char wrk[8],*w;
 if (sz<=8) w=wrk; else w=(char*)memgive(sz);
-memmove(w,a,sz);
-memmove(a,b,sz);
-memmove(b,w,sz);
+memmove(w,ad1,sz);
+memmove(ad1,ad2,sz);
+memmove(ad2,w,sz);
 if (sz>8) memtake(w);
 }
 
@@ -502,8 +501,8 @@ int cp_short(const void *a, const void *b)
 int cp_ushort(const void *a, const void *b)
 {return((*((ushort*)a)<*((ushort*)b))?-1:(*((ushort*)a)>*((ushort*)b)));}
 
-//int cp_long(const void *a, const void *b)
-//{return((*((long*)a)<*((long*)b))?-1:(*((long*)a)>*((long*)b)));}
+int cp_long(const void *a, const void *b)
+{return((*((int32_t*)a)<*((int32_t*)b))?-1:(*((int32_t*)a)>*((int32_t*)b)));}
 
 int cp_int32_t(const void *a, const void *b)
 {return((*((int32_t*)a)<*((int32_t*)b))?-1:(*((int32_t*)a)>*((int32_t*)b)));}

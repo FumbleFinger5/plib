@@ -1,9 +1,12 @@
-#define USE_QSETTINGS YES
+//#define USE_QSETTINGS YES
 
 #ifdef USE_QSETTINGS
 #include <QApplication>
 #include <QTime>
 #include <QSettings>
+int use_qsettings(void) {return(1);}
+#else
+int use_qsettings(void) {return(0);}
 #endif 
 
 #include <unistd.h>
@@ -115,14 +118,6 @@ e->e.rating=om.rating;
 return(YES);
 }
 
-/*static void write_all_text(char *fn, char *txt)
-{
-HDL f=flopen(fn,"w");
-flput(f,strlen(txt),f);
-flclose(f);
-sjhLog("Wrote all api text to %s",fn);
-}*/
-
 bool OMDB::put(EM_KEY1 *e)	// Add this movie, taking nam+rating  from passed key
 {                           // get other fields from imdb API
 char buf[4096], w[2048];    // Allow PLENTY of space for the ENTIRE ibmdb API call
@@ -142,6 +137,7 @@ om.cast=people2rhdl(w);
 om.runtime=a2i(strquote(buf,"Runtime"),0);  // Should maybe check format really is "nnn min"
 om.added=short_bd(calnow());
 om.seen=e->seen;
+om.seen_hr=e->e.seen_hr;
 om.filesz=e->filesz;
 bkyadd(om_btr,recadd(db,&om,sizeof(OM_KEY)),&om.imdb_num);
 strquote(0,0);              // release allocated strings used to fish data out of returned API buffer
@@ -189,12 +185,14 @@ if (om.rating!=e->e.rating)
         }
     upd=YES; om.rating=e->e.rating;
     }
+om.seen_hr=e->e.seen_hr;
 if (om.seen!=e->seen) {upd=YES; om.seen=e->seen;}
 if (om.filesz!=e->filesz) {upd=YES; om.filesz=e->filesz;}
 if (upd) zrecupd(db,rh,&om,sizeof(OM_KEY));
 return(YES);
 }
 
+/*
 void OMDB::fix(int32_t ino, short eno)  // only run ONCE (fix inital eno=9999 values)
 {
 RHDL rh;
@@ -205,7 +203,26 @@ if (zrecget(db,rh,&om,sizeof(OM_KEY))!=sizeof(OM_KEY)) throw(88);
 om.emdb_num=eno;
 zrecupd(db,rh,&om,sizeof(OM_KEY));
 }
+*/
 
+/*
+void OMDB::test(void)
+{
+RHDL rh;
+OM_KEY om;
+int again=NO, imdb_num;
+int ct=0, nonz=0;
+while (bkyscn_all(om_btr,&rh,&imdb_num,&again))
+    {       // change director, cast contents to "No. of subscripts into RHNM (after OM structure)"
+    if (zrecget(db,rh,&om,sizeof(OM_KEY))!=sizeof(OM_KEY)) throw(88);
+    if (om.seen_hr) nonz++;
+    ct++;
+    }
+printf("ct=%d  nonz=%d\r\n",ct,nonz);
+}*/
+
+
+/*
 struct FIX2 {short emdb_num; int32_t imdb_num;};
 static int cp_fix2(const FIX2 *a, const FIX2 *b)
 {
@@ -245,6 +262,7 @@ zrecupd(db,rh,&om,sizeof(OM_KEY));
     prv=ff->emdb_num;
     }
 }
+*/
 
 bool OMDB::del(int32_t imdb_num)
 {
@@ -342,7 +360,7 @@ HDL OMDB::bck_open(const char *mode)
 {
 HDL f=flopen(bk_fn,mode);
 if (f==NULL) {Sjhlog("Can't open %s for '%s' access",bk_fn,mode); throw(101);}
-if (*mode=='r') sjhlog("Restoring database from %s",bk_fn);
+if (*mode=='r') Sjhlog("Restoring database from %s",bk_fn);
 return(f);
 }
 
@@ -459,7 +477,7 @@ char xx[16];
 strfmt(xx,"%s_path",ext);
 strcpy(fn,pm->get(xx));
 #endif
-if (!fn[0]) {sjhlog("No configured [%s] for OMDB.%s",xx,ext); throw(102);}
+if (!fn[0]) {Sjhlog("No configured [%s] for OMDB.%s",xx,ext); throw(102);}
 if (fn[strlen(fn)-1]!='/') strcat(fn,"/");
 strendfmt(fn,"OMDB.%s",ext);
 }
@@ -486,6 +504,7 @@ char fn[256];
     }
 #endif
 dbactivated=dbstart(32);
+int prv=dbsetlock(omdb_read_only);
 if (access(fn, F_OK ))		// mode=F_OK=0, where non-zero return value means file doesn't exist AT ALL
 	{						// mode could be either or both (R_OK|W_OK) for "User has Read / Write access"
 	Xecho("Creating database %s\r\n",fn);
@@ -497,6 +516,7 @@ if (access(fn, F_OK ))		// mode=F_OK=0, where non-zero return value means file d
 	dbsafeclose(db);
 	}
 db_open(fn);
+dbsetlock(prv);
 if (btrnkeys(om_btr)==0)
     {
     restore();
@@ -631,6 +651,8 @@ em->e.emdb_num=om->emdb_num;
 em->e.imdb_num=om->imdb_num;
 em->added=om->added;
 em->seen=om->seen;
+em->e.seen_hr=om->seen_hr;
+MOVE2BYTES(em->e.unused,om->unused);
 em->filesz=om->filesz;
 em->runtime=om->runtime;
 em->e.rating=om->rating;
@@ -662,6 +684,7 @@ return(eee);
 // by code to read OMDB.DBF rather than *.csv without "q3" knowing or caring (if 'action'==2)
 DYNTBL *make_emk(void)
 {
+if (!use_qsettings()) {sjhlog("omdb.cpp USE_QSETTINGS not defined"); throw(66);}
 OMDB om;
 om.backup_if_needed();
 return(om.dyntbl_out());
@@ -703,9 +726,9 @@ static void list(DYNAG *t, int rng)
 XDT *x;
 int i;
 char s[100];
-sjhlog("Rng:%d got %d elements...",rng,t->ct);
+sjhLog("Rng:%d got %d elements...",rng,t->ct);
 for (i=0;(x=(XDT*)t->get(i))!=NULL;i++)
-    sjhlog("%d %s %c", i, calfmt(s,"%C-%02O-%02D_%2T-%2I.bck",x->dttm), x->ext);
+    sjhLog("%d %s %c", i, calfmt(s,"%C-%02O-%02D_%2T-%2I.bck",x->dttm), x->ext);
 }
 
 static char *strdt(int32_t dttm)
@@ -735,7 +758,7 @@ for (rng=0; rng<3; rng++)   // 0=Day, 1=Week, 2=Month
     if (rng==2) // Unilaterally delete any (N) elements / files more than a month old
         while (t1.ct>0 && (x=(XDT*)t->get(t1.ct-1))->dttm < dttm-(ONE_DAY*30))
             {
-            sjhlog("Delete backup *.bck%c %s more than 1 month old",x->ext,strdt(x->dttm));
+            Sjhlog("Delete backup *.bck%c %s more than 1 month old",x->ext,strdt(x->dttm));
             del_bckN(pth,&t1,t1.ct-1, Nused);
             }
     while (t1.ct > (rng?2:1)) // mx initially 1 for 'day' range 'cos it'll soon include renamed *.bck
@@ -783,7 +806,7 @@ int no_bck;
     no_bck=*parm.get("autobackup");
     }
 #endif
-if (TOLOWER(no_bck)=='n') {sjhlog("No AutoBCK"); return;}
+if (TOLOWER(no_bck)=='n') {Sjhlog("No AutoBCK"); return;}   // sjhlog - don't really want this
 int32_t db_dttm, bk_dttm=0;
 FILEINFO fi;
 if (!drinfo(dbfnam(db), &fi)) throw(99);
@@ -819,7 +842,14 @@ char fn[256];
     }
 #endif
 dbactivated=dbstart(32);
-int prv=dbsetlock(NO);
+//int prv=dbsetlock(NO);
+// *.db1 ALWAYS r/w access so far as the code is concerned
+// but user 'steve' works with a COPY of (Mike/Colin/Tess.db1)
+//                        in /var/tmp from rclone original mounted R/O
+// Other users copy main R/O database from DropBoxP into val/tmp
+
+int prv=dbsetlock(NOTFND);
+
 if (access(fn, F_OK ))		// mode=F_OK=0, where non-zero return value means file doesn't exist AT ALL
 	{						// mode could be either or both (R_OK|W_OK) for "User has Read / Write access"
 	Xecho("Creating database %s\r\n",fn);
@@ -831,8 +861,7 @@ if (access(fn, F_OK ))		// mode=F_OK=0, where non-zero return value means file d
 	dbsafeclose(db);
 	}
 db_open(fn);
-dbsetlock(prv);
-//sjhlog("omdb1 nkeys=%d",btrnkeys(om_btr));
+//dbsetlock(prv);
 return;
 err:
 m_finish("Error creating %s",fn);

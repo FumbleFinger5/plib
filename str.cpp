@@ -405,10 +405,8 @@ int i;
 while ((i=stridxc(chr,str))!=NOTFND) strdel(&str[i],1);
 }
 
-
-
-void strendfmt(char *s, const char *ctl,...)
-{va_list va; va_start(va,ctl); _strfmt(strend(s),ctl,va);}
+char *strendfmt(char *s, const char *ctl,...)
+{va_list va; va_start(va,ctl); _strfmt(strend(s),ctl,va); return(s);}
 
 static char *strpwhit(char* str)
 {
