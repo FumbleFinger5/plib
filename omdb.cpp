@@ -1,4 +1,4 @@
-//#define USE_QSETTINGS YES
+#define USE_QSETTINGS YES
 
 #ifdef USE_QSETTINGS
 #include <QApplication>
@@ -70,12 +70,12 @@ return(str);
 // If 'buf' doesn't contain 'id', return an EMPTY string (ie. - just a null-byte, being the EOS)
 static char *strquote(char *buf, const char *id)
 {
-static char sep[3]={34,58,34};      // ":" separates api returned id (name of fld) from "contents"
-static char *a[4];
+static char sep[3]={CHR_QTDOUBLE,COLON,CHR_QTDOUBLE};      // ":" separates api returned id (name of fld) from "contents"
+static char *a[4];                  // 4 ALOCATED ptrs so return values aren't immediately overwritten
 static int n=NOTFND; n=(n+1)&3;     // cycles 0,1,2,3,0,1,2,3,0,...
 if (buf==NULLPTR) {for (n=3;n>=0;n--) Scrap(a[n]); return(0);}  // "cleanup" call with nullptr
 int p=0, q, idlen=strlen(id), buflen=strlen(buf), vallen=NOTFND;
-while ((q=stridxc(CHR_QTDOUBLE,&buf[p]))!=NOTFND)
+while ((q=stridxc(CHR_QTDOUBLE,&buf[p]))!=NOTFND)   // Examine each DoubleQuote in 'buf'
     {
     if (p+q+idlen+5 > buflen) break; // insufficient remaining text to contain sought key+value pair
     if (memcmp(&buf[p+=(q+1)],id,idlen) || !SAME3BYTES(&buf[p+idlen],sep)) continue; // keep looking
@@ -670,8 +670,10 @@ int again=0;
 DYNTBL *eee = new DYNTBL(sizeof(EM_KEY1), (PFI_v_v)cp_em_key);
 EM_KEY1 e;
 RHDL rh;
+//int zzz=0;
 while (bkyscn_all(om_btr,&rh,&e.e.imdb_num,&again))
     {
+//printf("dyntbl_out %d\n",++zzz);
     OM_KEY om;
     if (zrecget(db,rh,&om,sizeof(OM_KEY))!=sizeof(OM_KEY)) throw(88);
     om2em(&e,&om);
@@ -979,3 +981,20 @@ else
     omdb.put_notes(imdb_num,t);
     }
 }
+
+
+bool OMDB::scan_all(EM_KEY1 *e, bool *again)	// If e->imdb_num key exists, populate 'e' and return TRUE, else FALSE
+{
+RHDL rh;
+OM_KEY om;
+if (!*again) {*again=YES; e->e.imdb_num=0;}
+if (!bkysrch(om_btr,BK_GT,&rh,&e->e.imdb_num)) return(NO);
+if (zrecget(db,rh,&om,sizeof(OM_KEY))!=sizeof(OM_KEY)) throw(88);
+char w[61];
+if (recget(db,om.nam,w,61)>60) throw(86);
+strcpy(e->e.nam,w);
+e->e.year=om.year;
+e->e.rating=om.rating;
+return(YES);
+}
+

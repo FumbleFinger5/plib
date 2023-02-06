@@ -1,6 +1,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "pdef.h"
 #include "flopen.h"
@@ -28,7 +29,7 @@ _strfmt(w,fmt,va);
 extern int flopen_status;
 flopen_status=2;
 HDL f=flopen(logpath,"a");
-if (!f) throw(SE_SJHLOG);
+if (!f) {printf("Can't open logfile [%s]",logpath); throw(SE_SJHLOG);}
 flputln(w,f);
 flclose(f);
 }

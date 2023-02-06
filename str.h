@@ -1,3 +1,6 @@
+#ifndef STR_H
+#define STR_H
+
 #define	STR_LJUST 	0			//ustification types for strjust()
 #define	STR_RJUST 	1
 #define	STR_CENTER 	2
@@ -60,3 +63,5 @@ private:
 int		ct;
 char	*bm;
 };
+
+#endif

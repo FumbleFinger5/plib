@@ -21,7 +21,7 @@ void	drscnrls(DIR *scn);
 
 int drinfo(const char *path, FILEINFO *pfile_info);
 int drisdir(const char *directory_path);
-int drattrget(const char *path, short *attr);
+int drattrget(const char *path, short *attr); // YES if file exists (fill optional 'attr')
 
 
 

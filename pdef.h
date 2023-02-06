@@ -46,6 +46,7 @@ typedef	uint32_t	RHDL;	// database record handle WAS 'long''
 //#define	CHR_QT1	39
 #define	CHR_QTSINGLE	39
 #define	CHR_QTDOUBLE	34
+#define	COLON				58
 #define	BACKSLASH		92
 #define	AMPERSAND		38
 

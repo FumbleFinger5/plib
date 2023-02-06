@@ -108,7 +108,7 @@ return(YES);
 
 
 
-int drattrget(const char *path, short *attr)
+int drattrget(const char *path, short *attr)	// YES if file exists (fill optional 'attr')
 {
 FILEINFO fi;
 int ok=drinfo(path,&fi);
@@ -137,7 +137,7 @@ return(0);
 //{return(strend(strcat(drfullpath(path,*path?path:dflt_path),"/")));}
 
 
-int drisdir(const char *directory_path)
+int drisdir(const char *directory_path)	// YES/NO - is path a directory?
 {
 char pth[FNAMSIZ];
 drfullpath(pth,directory_path);

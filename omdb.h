@@ -38,6 +38,9 @@ void backup_if_needed(void);
 //void fix2(void);
 //void test(void);
 
+bool scan_all(EM_KEY1 *e, bool *again);
+
+
 private:
 void backup(void);
 void	db_open(char *fn);
