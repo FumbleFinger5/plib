@@ -1,7 +1,7 @@
 TARGET = libplib.a
 #COMP = gcc
 COMP = clang++
-#BUG = -ggdb
+BUG = -ggdb
 CFLAGS = -I../mylib  -isystem /usr/include/x86_64-linux-gnu/qt5 \
    -isystem /usr/include/x86_64-linux-gnu/qt5/QtCore \
    -isystem /usr/include/x86_64-linux-gnu/qt5/QStandardItemModel \

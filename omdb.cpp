@@ -1,4 +1,4 @@
-#define USE_QSETTINGS YES
+//#define USE_QSETTINGS YES
 
 #ifdef USE_QSETTINGS
 #include <QApplication>
@@ -68,7 +68,7 @@ return(str);
 
 // Return ALLOCATED pointer to string containing the text value of 'id' field within  'buf'
 // If 'buf' doesn't contain 'id', return an EMPTY string (ie. - just a null-byte, being the EOS)
-static char *strquote(char *buf, const char *id)
+char *strquote(char *buf, const char *id)
 {
 static char sep[3]={CHR_QTDOUBLE,COLON,CHR_QTDOUBLE};      // ":" separates api returned id (name of fld) from "contents"
 static char *a[4];                  // 4 ALOCATED ptrs so return values aren't immediately overwritten
@@ -85,14 +85,22 @@ while ((q=stridxc(CHR_QTDOUBLE,&buf[p]))!=NOTFND)   // Examine each DoubleQuote 
 return(a[n]=copyhack(a[n],&buf[p],vallen));
 }
 
-// Call API with ImdbNo. If TRUE, 'buf' contains the values returned by api
-static bool call_api_with_number(int32_t imdb_num, char *buf, int mxsz)
+
+int32_t tt_number_from_str(const char *s)
+{
+if (*s=='_') s++;
+if (SAME2BYTES(s,"tt")) s+=2;
+return(a2l(s,0));
+}
+
+
+// Call API with ImdbNo. Populate passed 'buf' with the values returned by api
+void call_api_with_number(int32_t imdb_num, char *buf, int mxsz)
 {
 char cmd[256];
 strfmt(cmd,"%s%s&i=tt%07d' %s", "curl 'http://www.omdbapi.com/?apikey=", APIKEY, imdb_num, CURLE);
 int err=exec_cmd(cmd, buf, mxsz);
-//sjhLog("EXEC: %s",cmd);
-return(err==0);
+if (err) {sjhLog("Usherette EXEC FAILED: %s",cmd); throw(83);}
 }
 
 void OMDB::db_open(char *fn)
@@ -102,6 +110,66 @@ recget(db,dbgetanchor(db),&hdr,sizeof(hdr));						// Read anchor record
 if ( !hdr.ver || (om_btr=btropen(db,hdr.om_rhdl))==NULLHDL)
 	m_finish("Error reading %s",fn);
 }
+
+IMDB_API::IMDB_API(void)
+{
+char fn[256];
+PARM parm(PARM_FN);
+strcpy(fn,parm.get("imdb_api"));
+int i=strlen(fn);
+if (i<5) {sjhlog("No 'imdb_api' path"); throw(99);}
+if (fn[i-1]!='/') strendfmt(fn,"%c",'/');
+strendfmt(fn,"%s","imdb.api");
+dbactivated=dbstart(32);
+if (access(fn, F_OK ))		// mode=F_OK=0, where non-zero return value means file doesn't exist AT ALL
+	{						// mode could be either or both (R_OK|W_OK) for "User has Read / Write access"
+	Xecho("Creating database %s\r\n",fn);
+	if (!dbist(fn) || (db=dbopen(fn))==NULLHDL) goto err;
+	memset(&hdr,0,sizeof(hdr));
+	hdr.ver=1;
+	hdr.im_rhdl=btrist(db,DT_ULONG,sizeof(int32_t));
+	dbsetanchor(db,recadd(db,&hdr,sizeof(hdr)));
+	dbsafeclose(db);
+	}
+db_open(fn);
+imdb_num=0;
+return;
+err:
+m_finish("Error creating %s",fn);
+}
+
+void IMDB_API::db_open(char *fn)
+{
+if ((db=dbopen(fn))==NULLHDL) m_finish("Error opening %s",fn);
+recget(db,dbgetanchor(db),&hdr,sizeof(hdr));						// Read anchor record
+if ( !hdr.ver || (im_btr=btropen(db,hdr.im_rhdl))==NULLHDL)
+	m_finish("Error reading %s",fn);
+}
+
+const char *IMDB_API::get(int32_t imno, const char *name)
+{
+char str[256];
+RHDL rh;
+if (imno!=imdb_num)
+    {
+    imdb_num=imno;
+    memset(cachebuf,0,sizeof(cachebuf));
+    if (!bkysrch(im_btr,BK_EQ,&rh,&imdb_num)) return(NULL);
+    int sz=zrecsizof(db,rh);
+    if (sz<100 || sz>sizeof(cachebuf)) throw(87);
+    if (zrecget(db,rh,cachebuf,sz)!=sz) throw(88);
+    if (tt_number_from_str(strquote(cachebuf, "imdbID")) != imno) throw(66);
+    }
+return(strquote(cachebuf, name));   // return ptr to (alloc'd) copy of the named metric string
+}
+
+IMDB_API::~IMDB_API()
+{
+dbsafeclose(db);
+if (dbactivated) dbstop();
+}
+
+
 
 // HALF-HEARTED attempt to populate passed EM if found!
 bool OMDB::get(EM_KEY1 *e)	// If e->imdb_num key exists, populate 'e' and return TRUE, else FALSE
@@ -118,14 +186,18 @@ e->e.rating=om.rating;
 return(YES);
 }
 
+bool OMDB::get_ge(int32_t *imdb_num)	// If e->imdb_num key exists, populate 'e' and return TRUE, else FALSE
+{
+return(bkysrch(om_btr,BK_GE,NULL,imdb_num)!=0);
+}
+
 bool OMDB::put(EM_KEY1 *e)	// Add this movie, taking nam+rating  from passed key
 {                           // get other fields from imdb API
 char buf[4096], w[2048];    // Allow PLENTY of space for the ENTIRE ibmdb API call
 if (get((EM_KEY1*)memmove(&buf,e,sizeof(EM_KEY1)))) return(NO); // key already exists - can't add
 OM_KEY om;
 memset(&om,0,sizeof(OM_KEY));
-bool ok=call_api_with_number(om.imdb_num=e->e.imdb_num, buf, sizeof(buf));
-if (!ok) throw(83);
+call_api_with_number(om.imdb_num=e->e.imdb_num, buf, sizeof(buf));
 om.nam=recadd(db,e->e.nam,strlen(e->e.nam)+1);
 om.rating=e->e.rating;
 om.year=a2i(strquote(buf,"Year"),4);

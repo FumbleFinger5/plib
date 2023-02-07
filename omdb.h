@@ -27,6 +27,7 @@ OMDB(void);						// Constructor used by app progs
 ~OMDB();
 DYNTBL *dyntbl_out(void);			// returns OUTPUT table from data stored in omddb.dbf
 bool get(EM_KEY1 *e);				// If e->imdb_num key exists, populate 'e' and return TRUE, else FALSE
+bool get_ge(int32_t *imdb_num);	// Search for key GE passed value. Return YES and update key if found
 bool put(EM_KEY1 *e);				// If e->imdb_num key exists return FALSE, else add this movie
 bool upd(EM_KEY1 *e);				// ONLY update moviename + rating + seen + emdb_num + filesz
 bool del(int32_t imdb_num);		// Return Yes/No for Success/Failure
@@ -85,6 +86,20 @@ struct	{char ver, fill[3]; RHDL om_rhdl, Xnames_rhdl; char fill2[20];} hdr;
 bool	dbactivated;	// If dbstart didn't do anything in constructor, we won't dbSTOP in destructor
 };
 
+class IMDB_API {
+public:
+IMDB_API(void);						// Constructor used by app progs
+~IMDB_API();
+const char *get(int32_t imno, const char *name);
+private:
+void	db_open(char *fn);
+HDL	db,im_btr;
+struct	{char ver, fill[3];  RHDL im_rhdl; char fill2[24];} hdr;
+bool	dbactivated;	// If dbstart didn't do anything in constructor, we won't dbSTOP in destructor
+int32_t imdb_num;
+char cachebuf[4096];
+};
+
 
 class USRTXT {	// Get/Put User Notes (steve's in main OMDB.dbf, others in their personal OMDB.db1)
 public:
@@ -97,7 +112,9 @@ int32_t imdb_num;
 const char *txt=0;
 };
 
-
+char *strquote(char *buf, const char *id);  // used by usherette
+int32_t tt_number_from_str(const char *s);
+void call_api_with_number(int32_t imdb_num, char *buf, int mxsz);
 
 DYNTBL *make_emk();	// load new (from OMDB)
 
