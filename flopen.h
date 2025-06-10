@@ -27,7 +27,7 @@ struct PF_FIL	{
 #define	WRITE		O_WRONLY
 #define	READWRITE	O_RDWR
 
-HDL 	flopen(const char*,const char*);		// r=ReadWrite, R=ReadOnly, a=Append, w=Write
+HDL 	flopen(const char*,const char*);		/// r=ReadWrite, R=ReadOnly, a=Append, w=Write
 HDL     flopen_trap(const char*,const char*);
 void	flclose(HDL);
 int	    flcloseall(void);

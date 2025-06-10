@@ -168,7 +168,7 @@ do op[pos--]=0;
 return(op);
 }
 
-bool same_alnum(const char *a, const char *b)
+bool same_alnum(const char *a, const char *b)	// case-insensitive comparison - only letters and digits
 {
 while (*a || *b)
 	{
@@ -191,6 +191,53 @@ for (s=str;--n;s=&s[comma+1])
 	if ((comma=stridxc(COMMA,s))==NOTFND) return("");
 return(s);
 }
+
+void str_slash2dash(char *title)
+{
+int i;
+while ((i=stridxc(CHR_SLASH,title))!=NOTFND) title[i]=CHR_DASH;
+}
+
+char *str_size64(int64_t size)      // format int64 as str - reverse of a264(str)
+{
+const char *units[] = {"b", "K", "M", "G", "T"};
+static char bf[4][16], *buf;
+static int again=0;
+buf=bf[(again++) & 3];
+int unit_index = 0;
+double display_size = (double)size;
+while (display_size >= 1000 && unit_index < 4)
+   {
+   display_size /= 1000;
+   unit_index++;
+   }
+if (display_size >= 10 || unit_index == 0)
+   strfmt(buf,"%.0f%s", display_size, units[unit_index]);
+else
+   strfmt(buf, "%.1f%s", display_size, units[unit_index]);
+return(buf);
+}
+/*
+char *str_filesize(int64_t filesize)
+{
+static char formatted[16];
+static const char *units[] = {"bytes", "Kb", "Mb", "Gb", "Tb"};
+int i = 0;
+int64_t prv=0;
+while (filesize > 1024 && i < sizeof(units)/sizeof(units[0]) - 1) {prv=filesize; filesize /= 1024; i++;}
+int i1=filesize;
+int i3=((prv&1023)+50)/100;
+if (i3>9) i3=9;
+
+strfmt(formatted,"%d",i1);
+if (i1<100)
+{strendfmt(formatted,".%d",i3);}
+return(strendfmt(formatted,"%s",units[i]));
+
+//sprintf(formatted, "%.1f %s", (double)filesize, units[i]);
+sprintf(formatted, "%d.%d%s", i1,i3, units[i]);
+return formatted;
+}*/
 
 
 // get/put _binary124 use Intel "backwords" native binary storage mode
@@ -277,6 +324,24 @@ while (s[i] && ct--)
 		}
 	}
 return(result);
+}
+
+int64_t a264(const char *s)
+{
+const char *un="TGMKB";
+char unit=TOUPPER(s[strlen(s)-1]);
+if (ISDIGIT(unit)) unit='B';			// If last char doesn't identify units, assume Bytes
+int upos=stridxc(unit,un);
+int64_t n=a2i(s,0);
+if (a2err=='.') {n=(n+a2i(&s[stridxc('.',s)+1],0))*1000; upos++;}
+while (upos!=NOTFND && un[upos]!='B')
+	{
+	n*=1000;
+	if (!un[++upos]) upos=NOTFND;
+	}
+if (upos==NOTFND)
+	m_finish("bad a264:%s",s);
+return(n);
 }
 
 
@@ -403,30 +468,6 @@ if (len>=4) return((char*)&str[len-4]);	// ptr -> the period before 3-char file 
 return((char*)str);  							// if passed string < 4 chars just return it
 }*/
 
-char *str_filesize(int64_t filesize)
-{
-static char formatted[16];
-static const char *units[] = {"bytes", "Kb", "Mb", "Gb", "Tb"};
-int i = 0;
-int64_t prv=0;
-while (filesize > 1024 && i < sizeof(units)/sizeof(units[0]) - 1) {prv=filesize; filesize /= 1024; i++;}
-int i1=filesize;
-int i3=((prv&1023)+50)/100;
-if (i3>9) i3=9;
-
-strfmt(formatted,"%d",i1);
-if (i1<100)
-{strendfmt(formatted,".%d",i3);}
-return(strendfmt(formatted,"%s",units[i]));
-
-//sprintf(formatted, "%.1f %s", (double)filesize, units[i]);
-sprintf(formatted, "%d.%d%s", i1,i3, units[i]);
-return formatted;
-}
-
-
-
-
 char *stradup(const char *s)	// NOT same as std library strdup() - uses my memgive() memory allocator
 {
 return (strcpy((char*)memgive(strlen(s)+1),s));
@@ -484,7 +525,7 @@ while ((i=stridxc(chr,str))!=NOTFND) strdel(&str[i],1);
 return(str);
 }
 
-char *strendfmt(char *s, const char *ctl,...)
+char *strendfmt(char *s, const char *ctl,...)   // append to, but return START of, passed string
 {va_list va; va_start(va,ctl); _strfmt(strend(s),ctl,va); return(s);}
 
 static char *strpwhit(char* str)
@@ -575,6 +616,16 @@ while (n>=0)
 if (len) memmove(fld,rec,len);
 fld[len]=0;
 return(fld);
+}
+
+char *tabify(char *str) // Convert non-quotated commas to tabs for vb_field()
+{
+char *s=str, c;
+strcat(s,","); // append comma to delineate the final element for vb_field()
+for (bool qt=false; (c=*s)!=0; s++)
+   if (c==COMMA && !qt) *s=TAB;
+   else if (c==CHR_QTDOUBLE) qt=!qt;
+return(str);
 }
 
 

@@ -25,34 +25,6 @@
 #include "imdb.h"
 #include "my_json.h"
 #include "qblob.h"
-//#include <json-c/json.h>
-
-#ifdef multistringing
-DYNAG *multistring2dynag(char *av, int avsz)
-{
-DYNAG *t=new DYNAG(0);
-while (avsz>0)
-    {
-    t->put(av);
-    int len=strlen(av)+1;
-    av+=len;
-    avsz-=len;
-    }
-return(t);
-}
-
-static void list_multistring(char *a, int sz)
-{
-while (sz>0)
-    {
-    sjhlog("[%s]",a);
-    int len=strlen(a)+1;
-    sz-=len;
-    a+=len;
-    }
-}
-#endif
-
 
 IMDB_API::IMDB_API(const char *override_fn)
 {
@@ -71,6 +43,7 @@ if (access(fn, F_OK ))		// mode=F_OK=0, where non-zero return value means file d
 	}
 db_open(fn);
 memset(&kyx,0,sizeof(kyx));
+jss4=new JSS4;
 return;
 err:
 m_finish("Error creating %s",fn);
@@ -114,25 +87,24 @@ if (imno!=kyx.imno)
     if (zrecget(db,rh,cachebuf,sz)!=sz) throw(88);
     }
 if (name==NULL) return(cachebuf);
-//return(strquote(cachebuf, name));   // return ptr-> (alloc'd) copy of named metric string
 json_object *parser = json_tokener_parse(cachebuf);
-char *ptr=jstr4(parser, name);
+const char *ptr=jss4->get(parser, name);
 json_object_put(parser); // Clean up
 return(ptr);   // return ptr-> (alloc'd) copy of named metric string
 }
 
-DYNAG *IMDB_API::get_tbl(void)	// return table of all imdb numbers in imdb.api file
+DYNAG *IMDB_API::get_tbl(void)	// return table of all imdb numbers in imdb.Api file
 {
 int ct=btrnkeys(im_btr);
 DYNAG *di=new DYNAG(sizeof(int32_t),ct);
 int again=0;
-int32_t imno;
-while (bkyscn_all(im_btr,NULL,&imno,&again))
+int32_t imno=0;
+while (bkysrch(im_btr,BK_GT,NULL,&imno)==YES)
     di->put(&imno);
 return(di);
 }
 
-void IMDB_API::put(int32_t imno, const char *buf)
+void IMDB_API::put(int32_t imno, const char *buf)  /// add or update
 {
 int len;
 kyx.imno=imno;
@@ -151,24 +123,24 @@ else
 }
 
 
-IMDB_API::~IMDB_API() {dbsafeclose(db);jstr4(0,0);}
+IMDB_API::~IMDB_API() {dbsafeclose(db);delete jss4;}
 
 
 // Call API with ImdbNo. Populate passed 'buf' with the values returned by api
-bool api_all_from_number(int32_t imno, char *buf8k)
+bool omdb_all_from_number(int32_t imno, char *buf8k)
 {
 char cmd[256];
 strfmt(cmd,"%s%s&i=tt%07d' %s", "curl 'http://www.omdbapi.com/?apikey=", apikey(), imno, STD_ERRNULL);
 int err=exec_cmd(cmd, buf8k, 8192);
-//sjhlog("%s:%d\n%s","Api_all_from_number",err,cmd);
-//sjhlog("%s",buf8k);
-if (err) {sjhLog("Usherette EXEC FAILED: %s",cmd); sjhLog("FAIL buffer [%s]",buf8k); throw(83);}
+if (err) {sjhLog("OMDBapi call FAILED: %s",cmd); sjhLog("FAIL buffer [%s]",buf8k); throw(83);}
 if (stridxs("Request limit reached!",buf8k)!=NOTFND)
     {sjhLog("API limit reached for key %s",apikey()); return(false);}
 return(true);
 }
 
-bool api_all_from_name(const char *name, int year, char *buf8k)
+#define omdb_fail "{\"Response\":\"False\""
+
+bool omdb_all_from_name(const char *name, int year, char *buf8k)
 {
 char cmd[256];
 strfmt(cmd,"%s%s%s%s","curl 'https://www.omdbapi.com/?apikey=", apikey(), "&t=\"", name);
@@ -177,6 +149,9 @@ int err=exec_cmd(cmd, buf8k, 8192);
 //sjhlog("%s:%d\n%s","Api_all_from_name",err,cmd);
 // IF buffer contains "Incorrect IMDb ID." THEN call themoviedb instead
 //sjhlog("%s",buf8k);
+// {"Response":"False"
+if (!err && strlen(buf8k)>strlen(omdb_fail) && !memcmp(buf8k,omdb_fail,strlen(omdb_fail)))
+   err=123;
 return(err==0);
 }
 

@@ -7,6 +7,7 @@ void	*memrealloc(void*,Uint);
 void	memtake(const void *data);
 int	memtakeall(void);		// Release all blocks allocated by memgive/memrealloc
 
+void swap_data(void *ad1, void *ad2, int sz);
 void	scrap(void **pointer);		// If non-NULL, delete & zeroise... BUT USE MACRO Scrap(memptr) or SCRAP(class)
 #define Scrap(a) scrap((void**)(&(a)))				//		ptr-> allocated memory
 #define SCRAP(a) {if (a) {delete (a); (a)=0;}}	//		ptr-> class object DON'T FOLLOW WITH SEMICOLON
@@ -49,7 +50,7 @@ void	*cargo(const void *data, int sz=0);	// general-purpose storage area within 
 int	total_size(void);		// total size of table (incl EOS of final string if sz=0)
 protected:
 int	find_str(int *p, const void *k);
-char	*a;
+char	*dta;
 int	len;
 private:
 void	init(int _sz, int _ct);
@@ -100,8 +101,8 @@ int is_mount();   // return 1 if /mnt, 2 if /media/<user>, 0 if neither (not a m
 struct TUPLE {char *name, *value;};
 
 class DYNTUPLE		// class of tuples (pair of ALLOCATED string pointers, name+value)
-{								// put() doesn't add items already present
-public:							// Contructor takes comparator as well as size
+{						// put() doesn't add items already present
+public:
 DYNTUPLE(void);
 ~DYNTUPLE();
 void	put(const char *name, const char *value);	// delete if value==NULL
@@ -109,19 +110,6 @@ const	char *get(const char *name);	// return fully-formatted allocated blob if n
 void	load(const char *blob);
 private:
 DYNAG *tbl;
-};
-
-class xNAMBAG	// trivial class to uniquely store (not too many) text strings
-{
-public:
-xNAMBAG();
-~xNAMBAG();
-int put(const char *s);
-const char *get(int i);
-private:
-DYNAG *d;
-int sz=0;
-char *ad=0;
 };
 
 #endif

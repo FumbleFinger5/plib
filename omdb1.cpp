@@ -18,20 +18,21 @@
 #include "str.h"
 #include "smdb.h"
 #include "omdb1.h"
-//#include "csv.h"
 #include "dirscan.h"
 #include "parm.h"
 #include "qblob.h"
-
 #include "imdb.h"
+#include "imdbf.h"
 
 
 
 char *fix_colon(char *nam)	// Change any ":" in MovieName to " -" and delete any '?'
 {
 char *p;
-while ((p=strchr(nam,':'))!=NULL) strins(strdel(p,1)," -");
-while ((p=strchr(nam,'?'))!=NULL) strdel(p,1);
+//while ((p=strchr(nam,':'))!=NULL) strins(strdel(p,1)," -");
+//while ((p=strchr(nam,'?'))!=NULL) strdel(p,1);
+while ((p=strchr(nam,':'))!=NULL) *p=SPACE;
+while ((p=strchr(nam,'?'))!=NULL) *p=SPACE;
 return(nam);		// Return passed string address as a convenience
 }
 
@@ -43,13 +44,7 @@ return(a2l(s,0));
 }
 
 
-int user_not_steve;
-static void get_user(void)
-{
-char *usr=getenv("USER");
-if (usr==NULL || strcmp(usr,"steve"))   // read-only mode unless user is ME!
-    user_not_steve=YES;     // Accessed by q3:window.cpp AND plib:omdb.cpp
-}
+int user_not_steve, running_live;
 
 static void flset_dttm(const char *dst, const char *src) // set dttm of 'dst' filename to match that of 'src'
 {
@@ -107,6 +102,7 @@ if (access(fn, F_OK ))		// mode=F_OK=0, where non-zero return value means file d
 	dbsafeclose(db);
 	}
 db_open(fn);
+if (btrnkeys(om_btr)==0) restore();
 return;
 err:
 m_finish("Error creating %s",fn);
@@ -133,6 +129,25 @@ if (bkysrch(om_btr,BK_EQ,&rh,&k->imno))
     return(true);
     }
 return(false);
+}
+
+bool OMDB1::upd_title(int32_t imno, const char *title)
+{
+OM1_KEY k;
+if (!get_om1(imno,&k)) m_finish("buggerbugger");
+char prv[80];
+if (k.mytitle==NULLRHDL)
+    *prv=0;
+else if (zrecget(db,k.mytitle,prv,sizeof(prv))>64)
+    m_finish("bad user title size");
+if (title!=NULLPTR && !strcmp(prv,title))    // do nothing if custom title already matches wanted title
+    return(true);
+bool kyupd=false;       // dont think i need this one!
+if (title==NULLPTR)                          // if no new custom title specified, delete any existing one 
+    {recdel(db,k.mytitle); k.mytitle=0;}
+else
+    k.mytitle=zrecadd_or_upd(db, k.mytitle, (void*)title, strlen(title)+1, &kyupd);
+return(upd(&k));
 }
 
 bool OMDB1::get_om1(int32_t imno, OM1_KEY *k)
@@ -203,7 +218,8 @@ if (rh!=0) recupd(db,rh,&omk,sizeof(OM1_KEY));
 else  bkyadd(om_btr,recadd(db,&omk,sizeof(OM1_KEY)),&omk);
 }
 
-std::string OMDB1::get_notes(int32_t imno)
+//char* OMDB1::get_notes(int32_t imno)   // returns an ALLOCATED string
+std::string OMDB1::get_notes(int32_t imno)   // returns an ALLOCATED string
 {
 OM1_KEY om1;
 if (!get_om1(imno,&om1) || om1.notes==NULLRHDL) return((char*)memgive(1));
@@ -213,6 +229,7 @@ if (sz==0 || txt[sz-1]!=0) throw(81);   // Notes record must be non-zero length,
 std::string sstr(txt);
 memtake(txt);
 return(sstr);
+//return(txt);
 }
 
 void OMDB1::put_notes(int32_t imno, const char *txt)
@@ -245,7 +262,6 @@ else
 recupd(db,rh,&om1,sizeof(OM1_KEY));
 }
 
-#include "imdbf.h"
 
 void OMDB1::list_missing(void)  // List all movies 
 {
@@ -254,24 +270,93 @@ RHDL rh;
 int ct=0, again=0;
 OM1_KEY om1;
 SMDB s;
-//IMDB_FLD im;                // Only used to get titles to show alongside missing imdbID numbers
+short *loct=(short*)memgive(100*sizeof(short));
+IMDB_API ia;
 int rct=btrnkeys(om_btr);
 short today=short_bd(calnow());
 while (bkyscn_all(om_btr,&rh,&om1,&again))
     {
     if (recget(db,rh,&om1,sizeof(OM1_KEY))!=sizeof(OM1_KEY)) throw(88);
     DYNTBL *dt=s.get(om1.imno);
-    if (dt->ct==0 && om1.added>(today-300))
-        {
-        char buf[128];
-strcpy(buf,"(didn't look up moviename)");
-//im.get(om1.imno,FID_TITLE,buf);
-        Xecho("%d  %s\r\n",om1.imno,buf);
-        ct++;
-        }
+   if (dt->ct>0) {EMK *ek=(EMK*)dt->get(0); for (int i=0;i<dt->ct;i++) loct[ek[i].locn]++;}
+if (om1.imno==0) {sjhlog("smdb no imno!"); continue;}
+
+   if (dt->ct==0)
+      {
+      Xecho("%8d %2d %s (%4.4s)\n",om1.imno,om1.rating, ia.get(om1.imno,"Title"), ia.get(om1.imno,"Year"));
+      ct++;
+      }
     delete dt;
     }
 Xecho("%d missing movies listed\r\n",ct);
+for (int i=0;i<100;i++) if (loct[i]) Xecho("Films%02d: %d\n",i,loct[i]);
+Xecho("REDIRECT O/P AND SORT USING\nsort -k2,2nr t.t > t.srt\n");
+memtake(loct);
+}
+
+static int getrh(HDL db, RHDL *rh, char *buf)
+{
+int sz=zrecsizof(db,*rh);
+if (zrecget(db,*rh,buf,sz)!=sz || buf[sz-1]!=0 || strlen(buf)!=sz-1) m_finish("corrupt zrec");
+return(sz);
+}
+
+HDL OMDB1::flopen_bak(const char *mode)
+{
+char fn[256];
+strcpy(fn,dbfnam(db));
+MOVE4BYTES(&fn[strlen(fn)-3],"bak");
+return(flopen(fn,mode));
+}
+
+void OMDB1::backup(void)  // write database contents as a "flat" file for restore/rebuild/optimise storage (+fix btrnkeys) 
+{
+RHDL rh;
+OM1_KEY om1;
+int32_t ct, again;
+while (bkyscn_all(om_btr,&rh,&om1,&again)) ct++;
+HDL f=flopen_bak("w");
+flput(&ct,sizeof(int32_t),f);
+for (ct=again=0; bkyscn_all(om_btr,&rh,&om1,&again); ct++)
+   {
+   char notes[8192], mytitle[128];
+   if (recget(db,rh,&om1,sizeof(OM1_KEY))!=sizeof(OM1_KEY)) throw(88);
+   if (om1.notes) om1.notes=getrh(db, &om1.notes, notes);
+   if (om1.mytitle) om1.mytitle=getrh(db, &om1.mytitle, mytitle);
+   flput(&om1,sizeof(OM1_KEY),f);
+   if (om1.notes) flput(notes,om1.notes,f);
+   if (om1.mytitle) flput(mytitle,om1.mytitle,f);
+   }
+printf("Wrote %d records to %s\n",ct,flnam(f));
+flclose(f);
+if (ct!=btrnkeys(om_btr)) printf("(database erroneously says %d records)\n",btrnkeys(om_btr));
+}
+
+void OMDB1::restore(void)  // populate btree from "flat" file *.bak 
+{
+HDL f=flopen_bak("R");
+if (f==NULLHDL) return;
+printf("Restoring from %s\n",flnam(f));
+OM1_KEY om1;
+int32_t ct;
+flget(&ct,sizeof(int32_t),f);
+char notes[8192], mytitle[128];
+while (ct--)
+   {
+   flget(&om1,sizeof(OM1_KEY),f);
+   if (om1.notes) {flget(notes,(int)om1.notes,f); om1.notes=zrecadd(db,notes,(int)om1.notes); }
+   if (om1.mytitle) {flget(mytitle,(int)om1.mytitle,f); om1.mytitle=zrecadd(db,mytitle,(int)om1.mytitle); }
+   bkyadd(om_btr,recadd(db,&om1,sizeof(OM1_KEY)),&om1.imno);
+   }
+flclose(f);
+printf("Restored %d records to %s\n",btrnkeys(om_btr),dbfnam(db));
+}
+
+//const char* USRTXT::get(void)
+std::string USRTXT::get(void)
+{
+//return((const char*)om->get_notes(imno));
+return(om->get_notes(imno));
 }
 
 DYNAG* USRTXT::extract(const char *subrec_name)

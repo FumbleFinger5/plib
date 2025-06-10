@@ -89,6 +89,16 @@ while (bkyscn_all(flm_btr,0,&e,&again))
 return(t);
 }
 
+bool SMDB::scan_all(EMKi *k, bool *again)	// successively return all records
+{
+if (!*again)
+   {
+   *again=true;
+   memset(k,0,sizeof(EMKi));
+   }
+return(bkysrch(flm_btr, BK_GT, NULL, k));  // no
+}
+
 SMDB::~SMDB()
 {
 dbsafeclose(db);
@@ -113,4 +123,20 @@ EMKi e;
 int again=NO;
 while (bkyscn_all(flm_btr,0,&e,&again))
 	if (e.e.dvd) printf("I:tt%07d dvd in Films%02d\n",e.imno,e.e.locn);
+}
+
+
+int32_t SMDB::locn_dttm(uchar locn, int32_t dttm_upd)
+{
+int32_t dttm[100];
+int sz=100*sizeof(int32_t);
+if (hdr.locn_rhdl) {if (recget(db,hdr.locn_rhdl,dttm,sz)!=sz) m_finish("locn_dttm recsz error");}
+else hdr.locn_rhdl=recadd(db,memset(dttm,0,sz),sz);
+if (dttm_upd!=NOTFND)
+   {
+   dttm[locn]=dttm_upd;
+   recupd(db,hdr.locn_rhdl,dttm,sz);
+	recupd(db, dbgetanchor(db), &hdr, sizeof(hdr));
+   }
+return(dttm[locn]);
 }

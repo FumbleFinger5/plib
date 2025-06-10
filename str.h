@@ -7,11 +7,11 @@
 
 
 char	*strancpy(char *dst, const char *src, int bufsz); // NE Ansi - mine ALWAYS appends eos null
-char    *stradup(const char *s);	// NE Ansi - mine uses memgive() memory allocator
-char    *strfmt(char *str ,const char *fmt,...);
+char  *stradup(const char *s);	// NE Ansi - mine uses memgive() memory allocator
+char  *strfmt(char *str ,const char *fmt,...);
 //char    *_strfmt(char*s1 ,const char*s2,va_list va);
 char	*_strfmt(char *str,const char *fmt,va_list);
-char	*strendfmt(char *str, const char *fmt,...);
+char	*strendfmt(char *str, const char *fmt,...);   // append to, but return START of, passed string
 char	*_strnfmt(char*,int, const char*, va_list);
 char	*strend(const char *str);
 char	*strdel(char *str, int ct);				// delete 'ct' chars from front of 'str'
@@ -31,7 +31,11 @@ char	*strtrim(char*);				// Remove leading AND trailing white space
 char	*strxlt(char *str, char from, char to);
 char	*strcommas2tabs(char *csvbuf);   // convert field-separating (NOT within quoted strings) commas to tabs
 //char  *Strlast4(const char *str);      // return ptr-> last 4 chars (useful for checking file extensions]
-char  *str_filesize(int64_t sz);        // return ptr-> static buffer formatted as <n> "bytes, Kb, Mb, Gb,..."
+//char  *str_filesize(int64_t sz);        // return ptr-> static buffer formatted as <n> "bytes, Kb, Mb, Gb,..."
+char *str_size64(int64_t size);
+void str_slash2dash(char *title);      /// change any slashes to dashes in titles that can be file/foldername
+
+
 
 bool  strget_yn(char *buf, int bufsz, const char *prompt=NULL);
 bool  strget_yn_loop(const char *prompt);       // only returns when either 'y' or 'n' keyed
@@ -40,11 +44,13 @@ bool  strget_yn_loop(const char *prompt);       // only returns when either 'y' 
 bool	same_alnum(const char *a, const char *b);	// Are strings "the same" ignoring any non-alphanumeric chars?
 
 char	*vb_field(const char *rec, int n);
+char  *tabify(char *str); // Convert non-quotated commas to tabs
 
-int dot2i(const char *s);    // if s contains 2 digits separated by '.' return 10x the number, else NOTFND
+int     dot2i(const char *s);    // if s contains 2 digits separated by '.' return 10x the number, else NOTFND
 
 ushort	a2i(const char *str, int len);
-Ulong		a2l(const char *str, int len);
+Ulong	a2l(const char *str, int len);
+int64_t a264(const char *s);    // convert 3-digit (up to 1 decimal place) value + T/G/M/K/B to int64
 int		a2l_signed(const char *str, int len);
 extern	int a2err, a2err_char;			// Error on last call to a2l() (0=OK, 1=Fail, 2=EmptyString. If 1, a2err_char is the non-digit we found
 

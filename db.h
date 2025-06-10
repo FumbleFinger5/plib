@@ -57,14 +57,16 @@ bool	bkydel_rec(HDL btr, void *key);			// delete key AND rhdl		// if key doesn't
 void	bkydel_all(HDL h_btr, int del_rhdl);					// del ALL keys and maybe recs
 int	bkyupd(HDL btr,RHDL rhdl,void *key);					// YES/NO = OK/Fail
 int	bkyscn_all(HDL btr,RHDL *rhdl,void *key, int *again);
-int	bkysrch(HDL btr, int mode,RHDL *rhdl,void *key);		// YES/NO = OK/Fail
+bool	bkysrch(HDL btr, int mode,RHDL *rhdl,void *key);		// true/false = OK/Fail
 void	*btrcargo(HDL btr,void *cargo);							// get/update 10-byte btr cargo
 void	btrclose(HDL btr);
 int32_t	btrnkeys(HDL btr);
 void	btrrls(HDL btr);
 void	btr_set_cmppart(HDL btr, PFI_v_v func);					// (db internal)
 RHDL	btrist(HDL btr, int keytyp, int keysiz);
-HDL		btropen(HDL btr,RHDL rhdl_btr);
+HDL	btropen(HDL btr,RHDL rhdl_btr);
+HDL	btr_get_db(HDL h_btr);						// returns the db handle containing this btr
+int	btr_get_keysiz(HDL h_btr);						// returns keysiz of this btr
 
 char	*dbfnam(HDL db);				// Fully-qualified pathname of *.DBF file
 void	dbckpt(HDL db);

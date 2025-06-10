@@ -13,7 +13,7 @@
 
 SCAN_ALL::SCAN_ALL(void)	// Class to handle 'cached' values gotten by api calls
 {									// Comstructor uses IMDB_FLD object to load EVERYTHING into memory
-int i;							// app then calls get(imno, fld_id, op_buf) for each specific values
+int i;							// app then calls get(imno, fld_id, op_buf) for each specific value
 for (fct=0;idx_fid[fct]!=0;fct++) *(short*)&idx[fct]=idx_fid[fct];
 _ff=(FCTL*)memgive(fct*sizeof(FCTL));
 for (i=0;i<fct;i++)
@@ -29,7 +29,7 @@ mct=ia.recct();
 int32_t SCAN_ALL::scan_all(int *subscript)	// subscript set to NOTFND by caller to start the loop
 {															// successively return next imdb number until EOF = NOTFND
 if (++subscript[0]>=mct) return(NOTFND);
-int32_t imno=((IMN2XLT*)_ff->ph)[subscript[0]].imno;	// _ff EQV ff[0] (the FID_IMDB_NUM entry)
+int32_t imno=((IMN2XLT*)_ff->ph)[subscript[0]].imno;	// _Ff EQV ff[0] (the FID_IMDB_NUM entry)
 return(imno);
 }
 
@@ -40,7 +40,7 @@ if (fld_id==FID_IMDB_NUM) return(strfmt(buf,"%d",imno));
 int fx=stridxc(fld_id,idx);		// If stridxc returns NOTFND (unknown ID) we're fucked anyway
 if (fx==NOTFND) return(buf);
 ff=&_ff[fx];
-IMN2XLT *im=(IMN2XLT*)_ff->ph;	// _ff EQV ff[0] = FCTL for FLD_IMDB_NUM mastertable
+IMN2XLT *im=(IMN2XLT*)_ff->ph;	// _Ff EQV ff[0] = FCTL for FLD_IMDB_NUM mastertable
 int mx=in_table(NULL,&imno,im,mct,sizeof(IMN2XLT),cp_long);
 if (mx==NOTFND) return(buf);	// THIS movies not indexed in imdb.dbf, so return empty string
 
@@ -56,7 +56,7 @@ if (fld_id==FID_GENRE || fld_id==FID_TITLE)	// For these, 'ph' = DYNAG(2) of sho
 	{
 	av=(char*)((DYNAG*)ff->pa)->get(((short*)ff->ph)[xlt]);   // subscript into allv for this movie's value
 	if (fld_id==FID_GENRE) genre_uncompress(av,buf);
-	else strcpy(buf,av);
+	else {strcpy(buf,av); int i; while ((i=stridxc(CHR_SLASH,buf))!=NOTFND) buf[i]=CHR_DASH;}
 	return(buf);
 	}
 if (fld_id==FID_CAST || fld_id==FID_DIRECTOR)	// For these, 'ph' = DYNAG(0) and each vari-length entry
@@ -75,7 +75,7 @@ for (int i=0;i<fct;i++)
 	{
 	ff=&_ff[i];
 	if (ff->id==FID_IMDB_NUM) {memtake(ff->ph); continue;}
-	delete ((DYNAG*)ff->pa);
+	delete ((DYNAG*)ff->pa);		// does nothing if no 'pa' DYNAG was created for this id
 	if (ff->id==FID_GENRE || ff->id==FID_TITLE || ff->id==FID_YEAR || ff->id==FID_RUNTIME) memtake(ff->ph);
 	else delete ((DYNAG*)ff->ph);
 	}

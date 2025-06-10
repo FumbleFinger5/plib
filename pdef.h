@@ -34,52 +34,53 @@ typedef	uint32_t	RHDL;	// database record handle WAS 'long''
 //	Some useful macros
 //	General defines used almost everywhere
 
-#ifndef ABS
-#define	ABS(x) 	((x)<0?-(x):(x))
-#endif
-
+#define	AMPERSAND		38
+#define	BACKSLASH		92      // backslash \ as in escape sequences
+#define	CHR_SLASH	   	47      // forward slash / as in paths
 #define	BKSP	8
 #define	BIGLONG	0x7fffffff
-#define	SPACE	' '
-
 #define	CHR_HASH	35
-//#define	CHR_QT1	39
+#define	CHR_DASH	45
 #define	CHR_QTSINGLE	39
 #define	CHR_QTDOUBLE	34
 #define	COLON				58
-#define	BACKSLASH		92
-#define	AMPERSAND		38
-
-#define  EQUALS '='
 #define	COMMA	','
-#define	SEMICOLON	';'
-#define	PLUS	'+'
 #define	CPMEOF  0x1A		// <ctl-z> byte for eof in text files
 #define	CRET    '\r'		// 13
-#define	DIV2(x)	(((unsigned)(x))>>1)
-#define	EQ      0
+#define  EQUALS '='
 #define	ESC		27
-#define FNAMSIZ 256				// Max fully-qualified path is 255 chars + nullbyte
+#define	SEMICOLON	';'
+#define	SPACE	' '
+#define	LNFEED   '\n'		// 10
+#define	PLUS	'+'
+#define	TAB			'\t'
+
+#define	EQ      0
 #define	GT      1
-//#define	INRANGE(a,b,c)	(((b)<(a))?(a):(((b)<(c))?(b):(c)))
+#define	LT       (-1)
 #define	ISALPHA(c)	((('a'<=(c))&&((c)<='z')) || (('A'<=(c))&&((c)<='Z')))
 #define	ISHEX(c)	((('0'<=(c))&&((c)<='9')) || (('A'<=(c))&&((c)<='F')))
 #define	ISDIGIT(d)	(('0'<=(d))&&((d)<='9'))
-#define	LNFEED   '\n'		// 10
-#define	LT       (-1)
 
+#define  FNAMSIZ 256				// Max fully-qualified path is 255 chars + nullbyte
+
+#define	DIV2(x)	(((unsigned)(x))>>1)
+//#define	INRANGE(a,b,c)	(((b)<(a))?(a):(((b)<(c))?(b):(c)))
 #ifndef MAX
 #define	MAX(a,b) (((a)>(b))?(a):(b))
 #endif
 #ifndef MIN
 #define	MIN(a,b) (((a)<=(b))?(a):(b))
 #endif
+#ifndef ABS
+#define	ABS(x) 	((x)<0?-(x):(x))
+#endif
+
 
 
 #define	NULLPTR	((void *)0)		// use to pass null pointer to funcs
 #define	NULLHDL	((HDL)0)
 #define	NULLRHDL	((RHDL)0)
-#define	TAB			'\t'
 #define	TOLOWER(c)	((('A' <= c) && (c <= 'Z')) ? ((c)+('a'-'A')):(c))
 #define	TOUPPER(c)	((('a' <= c) && (c <= 'z')) ? ((c)-('a'-'A')):(c))
 #define	ISLOWER(c) ((c)>='a' && (c)<='z')
@@ -176,7 +177,8 @@ int		cp_ushort(const void *p1, const void *p2);		// the values as parameters
 
 int		cp_long(const void *p1, const void *p2);
 int		cp_int32_t(const void *p1, const void *p2);
-int		cp_int86_t(const void *p1, const void *p2);
+int      cp_int64_t(const void *a, const void *b);
+//int		cp_int86_t(const void *p1, const void *p2);     // ???
 
 int		cp_ulong(const void *p1, const void *p2);
 int _cdecl cp_ulong2(const void *a, const void *b);

@@ -1,6 +1,5 @@
 TARGET = libplib.a
 COMP = g++
-#COMP = clang++
 
 # Use  make r=1  for release version
 ifdef r
@@ -9,7 +8,8 @@ else
 BUG = -ggdb -DBUG=YES
 endif
 
-CFLAGS = -I../mylib  -isystem /usr/include/x86_64-linux-gnu/qt5 \
+CFLAGS = `pkg-config --cflags gtk+-3.0` \
+   -I../mylib  -isystem /usr/include/x86_64-linux-gnu/qt5 \
    -isystem /usr/include/x86_64-linux-gnu/qt5/QtCore \
    -isystem /usr/include/x86_64-linux-gnu/qt5/QStandardItemModel \
    -isystem /usr/include/x86_64-linux-gnu/qt5/QSettings \
@@ -26,12 +26,13 @@ CFLAGS = -I../mylib  -isystem /usr/include/x86_64-linux-gnu/qt5 \
 
 
 $(TARGET): str.o memgive.o \
-        cal.o flopen.o \
-        parm.o dirscan.o \
-        drinfo.o db.o \
-        csv.o my_json.o qblob.o tmdbc.o \
-        smdb.o imdb.o imdbf.o xcom1.o \
-        log.o omdb1.o exec.o scan.o serdbf.o
+	cal.o flopen.o \
+	parm.o dirscan.o \
+	drinfo.o db.o \
+	csv.o my_json.o qblob.o  tmdbc.o \
+	smdb.o imdb.o imdbf.o xcom1.o \
+	log.o omdb1.o exec.o scan.o \
+	mvdb.o
 	@ar rcs $@ $^
 	@echo $@ linked OK
 

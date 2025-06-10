@@ -2,6 +2,7 @@
 #define IMDBF_H
 
 #include "db.h"
+#include "imdb.h"
 
 //char *genre_compress(const char *ip, char *op); // convert full genre names to single characters  STATIC!!
 char *genre_uncompress(const char *ip, char *op); // or convert back again. 'op' must be big enough!
@@ -19,10 +20,12 @@ public:
 	int recct(void) { return (imx->ct); };
 	void put(int32_t imno, const char *buf); // store the entire 'buf' returned by api call
 	void put_imno(int32_t imno);				  // append another movieeNo to FID_IMDB record
-	bool put2a(char *val);						  // GENRE append ky.fid value for new movieNo to fld-specific record
-	bool put2b(char *val);						  // CAST append ky.fid value for new movieNo to fld-specific record
-	bool put2c(char *val);						  // 1-char
+	bool put2a(const char *val);						  // GENRE append ky.fid value for new movieNo to fld-specific record
+	bool put2b(const char *val);						  // CAST append ky.fid value for new movieNo to fld-specific record
+	bool put2c(const char *val);						  // 1-char
 	bool del(int32_t imno);						  // delete this movie completely
+	bool upd(DYNAG *avd);			// rewrite FLD_TITLE av rec with amended list
+	bool upd_title(int32_t imno, const char *title);
 private:
 	bool del2a(char fld_id, int xlt); // delete movie at pos 'xlt' from this fld_id (already deleted in master table)
 	bool del2b(char fld_id, int xlt); // same as del2a() except that does GENRE, this does CAST (maybe others later)
@@ -34,15 +37,11 @@ private:
 	void *load_rH(int elem_sz, int adj); // load rH record and check size (number of elements)
 
 	HDL fld_btr;
-	DYNTBL *imx; // Array of all imno values with associated xlt redirections
-	struct
-	{
-		char ver, fill[31];
-		RHDL fld_rhdl;
-		char fill2[24];
-	} hdr;
+	DYNTBL *imx; // Array of IMN2XLT elements (1 for each imno, with associated xlt redirection)
+	struct {char ver, fill[31]; RHDL fld_rhdl; char fill2[24];} hdr;
 	RHDL rH;
 	KYX kY;
+//   JSS4 *jss4;
 };
 
 

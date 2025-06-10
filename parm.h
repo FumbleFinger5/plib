@@ -29,9 +29,30 @@ char fn[256];
 DYNAG *tbl;
 };
 
+
+
+
+#include <gtk/gtk.h>
+#include <gdk/gdk.h>
+
+struct GW_GEOMETRY {int x, y, w, h, m;};
+
+class GET_SET_GEOMETRY
+{
+public:
+GET_SET_GEOMETRY(const char *app_name, GtkWidget *window);
+void save(void);
+private:
+const char *appName;
+GtkWindow *gtkWindow;
+GW_GEOMETRY geom;
+};
+   
+      
 char *parm_str(const char *setting, char *buf, const char *deflt);   // buf must be >= 128 bytes
 
 const char *apikey();
+extern int tapikey_throttle_force;
 const char *tapikey(int throttle=NO);
 char *get_conf_path(char *fn, const char *base_filename);
 

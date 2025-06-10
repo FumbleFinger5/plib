@@ -77,7 +77,6 @@ strendfmt(cmd," '{\"request_token\":\"%s\"}'", request_token);
 strendfmt(cmd,"  'https://api.themoviedb.org/3/authentication/session/new?api_key=%s'",tapikey());
 int err=exec_cmd(cmd, buf8k, 8192);
 strcpy(session_id,my_json_get(wrk,buf8k,sizeof(wrk),"session_id",0));
-//sjhlog("Authemticated session_id [%s] length:%d",session_id,strlen(session_id));
 return(true);
 }
 
@@ -120,9 +119,7 @@ if (!session_id_read(session_id)) return(false); //m_finish("SessionID read erro
 strfmt(cmd,"curl 'https://api.themoviedb.org/3/account?api_key=%s&session_id=%s' %s",tapikey(),session_id, STD_ERRNULL);
 int err=exec_cmd(cmd, buf8k, 8192);
 strcpy(wrk,my_json_get(wrk,buf8k,sizeof(wrk),"username",0));
-//sjhlog("User:%s",wrk);
 bool ok=(err==0 && wrk[0]!=0);
-//sjhlog("session:%40.40s %s",session_id,ok?"ok":"BAD!");
 return(ok);
 }
 
@@ -133,12 +130,44 @@ static void json2blob(JBLOB_READER *jb, const char *new_name, const char *buf8k,
 {
 char wrk[4096];			// March 2024 - now picking up "overview", so allow plenty of space
 my_json_get(wrk,buf8k,sizeof(wrk),old_name,0);
-if (SAME3BYTES(wrk,"[ \""))
-    jarray2list(wrk);
-uxlt(wrk);						// 28/2/24 - "normalise" Unicode characters in ALL fields 
-jb->put(new_name, wrk);
+jarray2list(wrk);
+uxlt(wrk);						// 28/2/24 - "normalise" Unicode characters in ALL fields
+if (SAME4BYTES(wrk,"[ ]")) MOVE4BYTES(wrk,"N/A");
+if (*wrk)                  // no need to test & copy - just leave any existing value if no new value 
+   jb->put(new_name, wrk);
 }
 
+static void copy2jb(JBLOB_READER *dst, JBLOB_READER *src, const char *id)
+{
+const char *value=src->get(id);
+if (*value) dst->put(id, value);
+}
+
+static bool json_empty(const char *ptr)
+{
+return(ptr==NULL || *ptr==0 || SAME4BYTES(ptr,"N/A") || SAME4BYTES(ptr,"[ ]") || SAME3BYTES(ptr,"[]"));
+}
+
+static void add_missing_tmdb_from_omdb(JBLOB_READER *tmdb, JBLOB_READER *omdb, const char *name)
+{
+const char *ptr=tmdb->get(name), *ptr2;
+if (json_empty(ptr))
+   if (!json_empty(ptr2=omdb->get(name)))
+      tmdb->put(name,ptr2);
+}
+
+static void add2tbuf_from_omdb(int32_t imno, JBLOB_READER *jb)
+{
+char buf8k[8196];
+if (!omdb_all_from_number(imno, buf8k)) {sjhlog("add2tbuf_from_omdb FAILED imno:%d",imno); return;}
+JBLOB_READER jb2(buf8k);
+copy2jb(jb,&jb2,"imdbRating");
+copy2jb(jb,&jb2,"imdbVotes");
+// jb = TMDB values, jb2 = OMDB values
+add_missing_tmdb_from_omdb(jb,&jb2,"Director");       // POPULATE MISSING TMDB VALUES FROM OMDB VALUES for these fields
+add_missing_tmdb_from_omdb(jb,&jb2,"Actors");
+add_missing_tmdb_from_omdb(jb,&jb2,"Genre");
+}
 
 // FLDX fld defines the field names expected in 'blob' regardless of what omdb or tmdb called them
 static void add2tbuf(JBLOB_READER *jb, OMZ *k)
@@ -157,10 +186,8 @@ strcat(cmd,", director: [.credits.crew[] | select(.job == \"Director\") | .name]
 strcat(cmd,", actors: (if .credits.cast then [.credits.cast[0:5][] | .name] else [] end)");
 strcat(cmd,", genres: [.genres[] | .name], overview: .overview");
 strcat(cmd,"}'");
-
 int err=exec_cmd(cmd, buf8k, sizeof(buf8k));
-if (err) {sjhlog("tmdbc.cpp Line 161, cmd:\n%s\nFailed!");}
-
+if (err) {sjhlog("tmdbc.cpp:add2tbuf() cmd:\n%s\nFailed!");}
 json2blob(jb,"Title",buf8k,"title");
 json2blob(jb,"Year",buf8k,"release_year");
 json2blob(jb,"Runtime",buf8k,"runtime");
@@ -170,49 +197,58 @@ json2blob(jb,"Genre",buf8k,"genres");
 json2blob(jb,"plot",buf8k,"overview");
 }
 
-int get_tmdb_result_type(const char *buf8k)
+static bool get_tmdb_result_type(uchar *tv, const char *buf8k) /// does buf8k contain tmdb "tv" or "movie" or NO results?
 {
-int tv;
-for (tv=0;tv<2;tv++) if (json_contains_data(buf8k, result_type[tv])) return(tv);
-m_finish("bad tmno");
-return(NOTFND);
+for (int i=0;i<2;i++) if (json_contains_data(buf8k, result_type[i])) {*tv=i; return(true);}
+sjhlog("bad TMNO");
+return(false);
 }
 
 // Passed 'buf' contains tmdb response to 'basic details' api call citing the IMDB number
 // Get TMDB number, and check which of "movie/tv results" exists, setting tmdbTV to 0/1
 // Put those 2 fields into a blob and call Add2tbuf to retrieve & add all other fields of interest
 // Before return, replace the passed contents of 'buf' with the newly-constructed json doc in the blob.
-static void tmdb2omdb(OMZ *oz, char *buf8k)
+static bool tmdb2omdb(OMZ *oz, char *buf8k)
 {
 char wrk[128];
 JBLOB_READER jb("");								// Create initially empty parser
 jb.put("imdbID",strfmt(wrk,"%d",oz->k.imno));
-
-oz->k.tv=get_tmdb_result_type(buf8k);
+if (!get_tmdb_result_type(&oz->k.tv,buf8k)) return(false);
 my_json_get(wrk,buf8k,sizeof(wrk),"id",result_type[oz->k.tv],0);	// get the TMDB id
-
 oz->k.tmno = a2l(wrk,0);
 if (oz->k.tmno<1) m_finish("Shite!");
 jb.put("tmdbID",wrk);
 jb.put("tmdbTV",oz->k.tv?"1":"0");
+
+//my_json_get(wrk,buf8k,sizeof(wrk),"first_air_date",result_type[oz->k.tv],0);
+// Nov '24 (Red Rose) passed buf8k has movie AND tv_results, but "first_air_date" is only in tv_results
+if (json_contains_data(buf8k,result_type[1]))   // are tv_results present?
+   {
+   my_json_get(wrk,buf8k,sizeof(wrk),"first_air_date",result_type[1],0);
+   if (valid_movie_year(a2i(wrk,wrk[4]=0)))
+      jb.put("Year",wrk);
+   }
 add2tbuf(&jb, oz);			// UniqCall
+add2tbuf_from_omdb(oz->k.imno,&jb);
 strcpy(buf8k,jb.get(NULL));
+return(true);
 }
 
 bool tmdb_find_imno(int32_t imno, char *buf8k)
 {
-char cmd[256];
+char cmd[256];       /// todo  -sS should be ok here rather than STD_ERRNULL
+//strfmt(cmd,"curl -sS 'https://api.themoviedb.org/3/find/tt%07d?api_key=%s&external_source=imdb_id'", imno, tapikey());
 strfmt(cmd,"curl 'https://api.themoviedb.org/3/find/tt%07d?api_key=%s", imno, tapikey());
 strendfmt(cmd,"%s %s","&external_source=imdb_id'", STD_ERRNULL);
 int err=exec_cmd(cmd, buf8k, 8192);
 return(err==0);
 }
 
-void tmdb_all_from_number(OMZ *oz, char *buf8k)
+bool tmdb_all_from_number(OMZ *oz, char *buf8k)
 {
-tmdb_find_imno(oz->k.imno,buf8k);
-tmdb2omdb(oz, buf8k);	// UniqCall RE-fill buf8k with data gotten from tmdb, reformatted to look like omdb
-//sjhlog("%s\n",buf8k);
+if (!tmdb_find_imno(oz->k.imno,buf8k)) // "first_air_date":"1996-05-12" // CAN'T SUCCEED IF oz->k.imno==0 !!!!!!!
+	return(false);
+return(tmdb2omdb(oz, buf8k));	// UniqCall RE-fill buf8k with data gotten from tmdb, reformatted to look like omdb
 }
 
 
@@ -227,7 +263,7 @@ json_object_put(parsed_json); // Properly release the JSON object
 return result;
 }
 
-bool tmdb_update_rating(bool (*authenticate)(char *session_id),
+bool tmdb_set_rating(bool (*authenticate)(char *session_id),
 								int32_t tmno, int32_t imno, int tv, int season, int episode, int my_rating)
 {
 char session_id[64];
@@ -255,7 +291,6 @@ if (tmdb_api(cmd, buf8k, 8192))
 	{
 	bool ok=is_success_true(buf8k);
 	if (!ok) sjhlog("cmd\n%s\nbuf8k\n%s\n",cmd,buf8k);
-//	sjhlog("Rating %d for TmdbID:%d ImdbID:%d",rating,tmno,imno);	// hkmsrda7
 	return(true);
 	}
 sjhlog("I:%d rating change failed!",imno);

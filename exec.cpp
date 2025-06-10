@@ -8,6 +8,7 @@
 #include <cstdlib>
 
 #include <unistd.h>
+#include <sys/wait.h>
 
 #include "pdef.h"
 #include "memgive.h"
@@ -16,8 +17,40 @@
 #include "flopen.h"
 
 #include "exec.h"
+#include "parm.h"
 
-static int kbhit()
+
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/select.h>
+
+static int kbhit(void) {
+    struct termios oldt, newt;
+    int ch;
+    int oldf;
+
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
+
+    ch = getchar();
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    fcntl(STDIN_FILENO, F_SETFL, oldf);
+
+    if (ch != EOF) {
+        ungetc(ch, stdin);
+        return 1;
+    }
+
+    return 0;
+}
+
+/*static int kbhit()
 {
 static const int STDIN = 0;
 static int initialized = 0;
@@ -33,7 +66,7 @@ if (! initialized)
 int bytesWaiting;
 ioctl(STDIN, FIONREAD, &bytesWaiting);
 return bytesWaiting;
-}
+}*/
 
 static int  getch(void)
 {
@@ -94,14 +127,29 @@ delete t;
 return(gb);
 }
 
+int exec_cmd_wait(const char *cmd) // 0 if ok, else error code
+{
+   int status;
+   pid_t pid = fork();
+   if (pid == 0) // Child process
+      {
+      execl("/bin/sh", "sh", "-c", cmd, (char *)NULL);
+      _exit(127); // Only reached if execl() fails
+      }
+   if (pid < 0) return -1; // Fork failed
+   waitpid(pid, &status, 0); // Wait for ffmpeg to finish
+   return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+}
+
 int exec_cmd(const char *cmd, char *buf, int bufsz) // 0 if ok, else error code
 {
+//sjhlog("exec_cmd: %s",cmd);
 FILE *f = popen(cmd,"r");
-int bytes=fread(buf, 1, bufsz-2, f);
-buf[bytes]=0;
-buf[bufsz-1]=0;
+int bytes=fread(buf, 1, bufsz, f);
+if (bytes==bufsz) {pclose(f); return(SE_BUFF64K);}   // return -268 = buffer overflow = we're fucked!
 int err=pclose(f);
-if (err<0) {Sjhlog("exec_cmd crashed!\r\n%s\r\n",cmd); throw(55);}
+if (!err) buf[bytes]=0;       // ensure the buffer is a null-terminated string
+//sjhlog("err:%d bytes:%d",err,bytes);
 return(err);
 }
 
@@ -114,4 +162,44 @@ if (id == 0)  // child process
     }
 }
 
+
+int exec_cmd_fork(const char *cmd)   // Returns 0 if ok, else error code
+{
+pid_t pid = fork();
+if (pid < 0) return -1;         // Fork failed
+if (pid == 0)                   // Child process - Execute the command with the shell, without capturing output
+    {
+    execlp("sh", "sh", "-c", cmd, (char *)NULL);
+    _exit(EXIT_FAILURE);
+    }
+int status;                     // Parent process
+waitpid(pid, &status, 0);       // Wait for child process to finish
+if (WIFEXITED(status))          // Return the exit code of the child process
+   return WEXITSTATUS(status);
+return -1;                      // if we get here, the command did not exit normally
+}
+
+void visit_imdb_webpage(int32_t imno)
+{
+char browser[128], s[128];
+strfmt(s,"%s%07d","https://www.imdb.com/title/tt",imno);    // open a browser tab for imdb webpage for movie
+execute(parm_str("browser",browser, "xdg-open"),s);
+}
+
+// Rename fully-qualified file or folder. Return YES if successful, else NO (fatal error?)
+void exec_rename(const char *from, const char *to)
+{
+char cmd[1024];
+int statusflag;
+strfmt(cmd, "%s %c%s%c %c%s%c", "mv", CHR_QTDOUBLE, from, CHR_QTDOUBLE, CHR_QTDOUBLE, to, CHR_QTDOUBLE);
+int id = fork();
+if (id == 0) // then it's the child process
+	execlp("/bin/sh", "/bin/sh", "-c", cmd, (char *)NULL);
+wait(&statusflag); // wait(&status) until child returns, else it might not be ready to use results
+if (statusflag!=0)
+	{
+	sjhlog("cmd: %s",cmd);
+	m_finish("Error moving/renaming %s to %s",from,to);
+	}
+}
 

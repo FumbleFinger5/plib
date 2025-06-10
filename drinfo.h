@@ -26,12 +26,18 @@ bool drisvid(const char *extension);
 const char *drext(const char *directory_path);
 bool drattrget(const char *path, short *attr); // YES if file exists (fill optional 'attr')
 
+int megabytes(int64_t size);  // DON'T USE! Just use size/1000000
+uint64_t get_free_space(const char *path);  // drive free space (bytes)
+
 bool unwanted_filename(const char *n);	// YES if it's a rarbg / yts / yify torrent file that we don't want
 
 
-int dr_filesize(const char *fn);		// the actual code uses #ifdef to compile special Raspberry Pi version
+int64_t dr_filesize(const char *fn);		// the actual code uses #ifdef to compile special Raspberry Pi version
+int64_t dr_foldersize(const char *pth);	// Recursively sum total size of specified folder
 
 char  *drsplitpath(char *dir_part, const char *fullpath);	// basename() and dirname() give same results!
 
 char *Basename(const char *fullpath);		// 'safe' wrapper copies fullpath to ensure it's not modified
 char *Dirname(const char *fullpath);		// 'safe' wrapper copies fullpath to ensure it's not modified
+
+int valid_films_path(char *pth);  // accept just 1-2 digits, and silently change to /media/.../FilmsNN

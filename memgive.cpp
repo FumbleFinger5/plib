@@ -34,7 +34,7 @@ static DYNTBL	*log;
 #endif
 #define EXTRA_BYTES (FST+LST)
 
-static void **a;
+static void **mcad;
 static int ct,c1;
 
 //int do_memchk;
@@ -45,7 +45,7 @@ void memchk(char *txt)
 int totsiz=0;
 for (int i=0;i<ct;i++)
 	{
-	char *c=(char*)a[i];
+	char *c=(char*)mcad[i];
 	int32_t siz=*(int32_t*)c;
 	totsiz+=siz;
 	if ((*(int32_t*)&c[FST-4]!=0x12345678 || *(int32_t*)&c[siz+FST]!=0x87654321))
@@ -67,14 +67,14 @@ sz=ct;
 }
 
 #ifdef MEMLOG
-#define LUMP 1024		// Chunk size for extending 'a'
+#define LUMP 1024		// Chunk size for extending 'dta'
 static void*  log_give(void *p, Uint siz)	// *p==REAL pointer	// Log this block as 'allocated'
 {																// and return address of "app-level data portion" of block
 char *c=(char*)p;
 Uint *u=(Uint*)p;
 u[0]=siz;
 u[1]=++uniq; 
-if (uniq==67)				// set to value of first_leak as reported by dllclosedown
+if (uniq==2791)				// set to value of first_leak as reported by dllclosedown
 give_first_leak(siz);	// breakpoint HERE when unique sequence number of the mem_leak is allocated
 *(int32_t*)&c[FST-4]=0x12345678;				// Put our special values before and after the address returned to app,
 *(int32_t*)&c[siz+FST]=0x87654321;				// so we can check for buffer over/underrun when it's released
@@ -83,9 +83,9 @@ if (ct>=MAXCT) throw SE_OUTOFHEAP;
 if (c1<=ct)
 	{
 	c1+=LUMP;
-	a=(void**)(ct?realloc(a,c1*sizeof(void*)):calloc(c1,sizeof(void*)));
+	dta=(void**)(ct?realloc(dta,c1*sizeof(void*)):calloc(c1,sizeof(void*)));
 	}
-a[ct++]=p;
+mcad[ct++]=p;
 return(&c[FST]);
 }
 
@@ -99,9 +99,9 @@ if ((*(int32_t*)&c[FST-4]!=0x12345678 || *(int32_t*)&c[siz+FST]!=0x87654321))
 	throw SE_MEMBAD;
 	}
 for (int	i=ct;i--;)
-	if (a[i]==c)
+	if (mcad[i]==c)
 		{
-		if (--ct>i) memmove(&a[i],&a[i+1],(ct-i)*sizeof(void*));
+		if (--ct>i) memmove(&mcad[i],&mcad[i+1],(ct-i)*sizeof(void*));
 		return;
 		}
 throw SE_MEMPTR;
@@ -171,7 +171,7 @@ while (ct)
 	{
 #ifdef MEMLOG
 		{
-		int32_t *pi=(int32_t*)a[ct-1];
+		int32_t *pi=(int32_t*)mcad[ct-1];
 //		int sz=pi[0];				// get the (app-requested) allocated block size,
 		int32_t sq=pi[1];				// - unique sequence number, (of this mem_leak)
 		if (!first_leak)
@@ -179,12 +179,12 @@ while (ct)
 //		char *data=(char*)&pi[3];	// - and 'pointer to app-perceived data area'
 		}							// so we can track down where it got allocated by the app
 #endif
-	memtake(((char*)(a[ct-1]))+FST);		// (memtake decrements ct)
+	memtake(((char*)(mcad[ct-1]))+FST);		// (memtake decrements ct)
 	}
 if (c1)
 	{
 	c1=0;
-	free(a);
+	free(mcad);
 	}
 return(leak);
 }
@@ -249,7 +249,7 @@ else		// create Slave dynag of offsets to strings if vari-length items
 	slave=new DYNAG(sizeof(int),_ct);
 	sz=128;
 	}
-a=(char *)memgive(sz);
+dta=(char *)memgive(sz);
 }
 
 DYNAG::DYNAG(int _sz, int _ct)
@@ -261,7 +261,7 @@ DYNAG::DYNAG(DYNAG *org)	// 'Copy' constructor initialised from existing DYNAG
 {
 init(org->len,org->ct);
 for (int i=0;i<org->ct;i++) put(org->get(i),i);
-if (org->_cargo) cargo(org->cargo(0),org->cargo_sz);
+if (org->_cargo) cargo(org->cargo(0),org->cargo_sz);  // Make a COPY of source cargo, if non-null
 }
 
 DYNAG::DYNAG(char *multistring, int sz)	// constructor (for len=0 = strings) initialised from multistring
@@ -280,7 +280,7 @@ DYNAG::DYNAG(HDL db, RHDL rh)	// constructor (for len=0 = strings) initialised f
 {
 init(0,0);
 int sz=0, len;
-char *multistring=(char*)zrecmem(db,rh,&sz);
+char *multistring=(char*)zrecmem(db,rh,&sz); // reliably free'd 6 lines below
 for (char *p=multistring; sz>0; sz-=len)
     {
     put(p);
@@ -292,7 +292,7 @@ memtake(multistring);
 DYNAG::~DYNAG(void)
 {
 Scrap(_cargo);
-memtake(a);
+memtake(dta);
 SCRAP(slave);
 }
 
@@ -303,27 +303,27 @@ int this_len;			// Avoids 'bitty' allocs, but minimises wasted 'slack'
 char *ret;				// Use put(0) to eliminate slack completely at any time
 if (!item)
 	{
-	a=(char *)memrealloc(a,(sz=eot)+!eot);
+	dta=(char *)memrealloc(dta,(sz=eot)+!eot);
 	return(0);
 	}	// avoid 'eot==0'!
 if (len) this_len=len; else this_len=strlen((char*)item)+1;
 if (eot+this_len>sz)
 	{
 	int newsz=sz+(sz/4+this_len+(len?(len*8):64));
-	a=(char *)memrealloc(a,sz=newsz);
+	dta=(char *)memrealloc(dta,sz=newsz);
 	}
-ret=&a[eot];	// save current end-of-table for return value
+ret=&dta[eot];	// save current end-of-table for return value
 eot+=this_len;			// Increase current 'used' table length
 if (n>=ct) n=NOTFND;
 if (n>=0)
 	{
 	ret=(char *)get(n);
-	memmove(&ret[this_len],ret,eot-(ret-a)-this_len);
+	memmove(&ret[this_len],ret,eot-(ret-dta)-this_len);
 	}
 else n=ct;
 if (!len)								// If adding entry to variable-length (len=0) DYNAG,
 	{									// bump up offsets in any following entries in Slave
-	int offset=ret-a;
+	int offset=ret-dta;
 	int *q=(int*)slave->put(&offset,n);
 	while (n++<ct)
 		(*(++q))+=this_len;
@@ -348,9 +348,9 @@ void *addr=0;
 if (n>=0 && n<ct)
 	{
 	if (len)
-		addr=&a[n*len];
+		addr=&dta[n*len];
 	else
-		addr=&a[*(int*)slave->get(n)];
+		addr=&dta[*(int*)slave->get(n)];
 	}
 return(addr);
 }
@@ -360,7 +360,7 @@ void DYNAG::del(int n)
 char *p=(char *)get(n);
 if (p)
 	{
-	int to=(int)(long(p)-long(a)), this_len=len;
+	int to=(int)(long(p)-long(dta)), this_len=len;
 	ct--;
 	if (!this_len)
 		{
@@ -368,7 +368,7 @@ if (p)
 		slave->del(n);
 		for (int x=n;x<ct;x++) *(int*)slave->get(x)-=this_len;
 		}
-	if ((n=eot-(to+this_len))>0) memmove(&a[to],&a[to+this_len],n);
+	if ((n=eot-(to+this_len))>0) memmove(&dta[to],&dta[to+this_len],n);
 	eot-=this_len;
 	}
 }
@@ -390,12 +390,18 @@ for (int n=0;(p=(char*)get(n))!=NULL;n++)
 return(NOTFND);
 }
 
+// If called with data!=NULL AND sz!=0, release any existing cargo & return allocated ptr -> copy of passed data
+// !!! Shouldn't currently be called with data!=NULL and sz==0 !!!
+// If called with data==NULL and sz!=0, set _cargo to zeroised allocated memory of specified size 
+// If called with data!=NULL but sz==0 (i.e. - not passed), just return the current cargo pointer
 void* DYNAG::cargo(const void *data, int sz)
 {
 if (sz)
 	{
 	Scrap(_cargo);
-	if (data) _cargo=memadup(data,cargo_sz=sz);
+	if (data) _cargo=memadup(data,sz);
+   else _cargo=memgive(sz);
+   cargo_sz=sz;
 	}
 return(_cargo);
 }
@@ -409,9 +415,9 @@ cp=_cp;
 
 int DYNTBL::set_cp(PFI_v_v _cp)
 {
-qsort(a,ct,len,cp=_cp);
+qsort(dta,ct,len,cp=_cp);
 for (int i=0; i<ct-1; i++)
-	if ( (cp)(&a[i*len],&a[(i+1)*len])>=0)
+	if ( (cp)(&dta[i*len],&dta[(i+1)*len])>=0)
 		return(NO);	// ??? - there must be a duplicate key!
 return(YES);
 }
@@ -425,7 +431,7 @@ return(get(in(k)));
 int DYNTBL::in(const void *k)
 {
 if (!len) return(DYNAG::in(k));
-return(in_table(0,k,a,ct,len,cp));
+return(in_table(0,k,dta,ct,len,cp));
 }
 
 int DYNAG::in_or_add(const void *k)
@@ -449,23 +455,23 @@ return(i);
 int DYNTBL::in_GE(const void *k)
 {
 if (!len) m_finish("SysErr 963");
-int p, exact=in_table(&p,k,a,ct,len,cp);	// If exact key doesn't exist, 'p' = position it would be at (i.e. BK_GE)
+int p, exact=in_table(&p,k,dta,ct,len,cp);	// If exact key doesn't exist, 'p' = position it would be at (i.e. BK_GE)
 if (exact==NOTFND && p==ct) p=NOTFND;
 return(p);
 }
 
 static const char *_aaa, *_kkk;
-static int _cdecl cp_slave(int *a, int *b)
+static int _cdecl cp_slave(int *aa, int *bb)
 {
-return(strcmp((*a==NOTFND)?_kkk:&_aaa[*a],(*b==NOTFND)?_kkk:&_aaa[*b]));
+return(strcmp((*aa==NOTFND)?_kkk:&_aaa[*aa],(*bb==NOTFND)?_kkk:&_aaa[*bb]));
 }
 
 int DYNAG::find_str(int *p, const void *k)
 {
-_aaa=a;
+_aaa=dta;
 _kkk=(const char*)k;
 int fix=-1;
-int exact=in_table(p,&fix,slave->a,ct,4,(PFI_v_v)cp_slave);	// If exact key doesn't exist, 'p' = position it would be at (i.e. BK_GE)
+int exact=in_table(p,&fix,slave->dta,ct,4,(PFI_v_v)cp_slave);	// If exact key doesn't exist, 'p' = position it would be at (i.e. BK_GE)
 if (exact==NOTFND && *p==ct) *p=NOTFND;
 return(exact);
 }
@@ -479,9 +485,9 @@ if (!len)			// TO DO: find where this is used (to maintain sorted table of text 
 	if (exact!=NOTFND) return(get(exact));
 	return(DYNAG::put(k,p));
 	}
-if (!cp || in_table(&p,k,a,ct,len,cp)==NOTFND)	// 050108 - just 'append' if comparator not yet set
+if (!cp || in_table(&p,k,dta,ct,len,cp)==NOTFND)	// 050108 - just 'append' if comparator not yet set
 	return(DYNAG::put(k,p));
-return(&a[len*p]);
+return(&dta[len*p]);
 }
 
 void* DYNTBL::puti(int i) {return(put(&i));}		// (just a little wrapper because we often store 1-2-4 byte int's in tables)
@@ -519,7 +525,6 @@ memtake(k);
 void FDYNTBL::save_to_disc(void)
 {
 HDL f=flopen(fn,"w");
-//printf("\nsave %d elements len:%d total %d\n",ct,len,ct*len);
 flput(get(0),len*ct,f);
 flclose(f);
 }
@@ -532,7 +537,7 @@ if (!no_save) save_to_disc();
 
 PATHDYNAG::PATHDYNAG(const char *fullpath):DYNAG(0,0)
 {
-char wrk[512], *p;
+char wrk[PATH_MAX], *p;
 int i;
 for (strcpy(p=wrk,fullpath); *p=='/' && !SAME2BYTES(p,"/"); p+=i)
 	{
@@ -545,11 +550,12 @@ for (strcpy(p=wrk,fullpath); *p=='/' && !SAME2BYTES(p,"/"); p+=i)
 if (ct==0) m_finish("Invalid fully-qualified path\n%s",fullpath);
 }
 
-int PATHDYNAG::is_mount(void)
+int PATHDYNAG::is_mount(void) // returns 1 if path starts with "mnt" or 2 if "media/<user>" ELSE ret=0
 {
-if (!strcmp((char*)get(0),"mnt")) return(1);
-if (!strcmp((char*)get(0),"media")) return(2);
-return(8);	
+char *pth=(char*)get(0);
+if (!strcmp(pth,"mnt")) return(1);
+if (!strcmp(pth,"media")) return(2);
+return(0);	
 }
 
 void swap_data(void *ad1, void *ad2, int sz)
@@ -623,6 +629,15 @@ return(cmp);
 
 int _cdecl cp_short2(const void *a, const void *b) {return(cp_shortn((short*)a,(short*)b,2));}
 
+int _cdecl cp_str(char *a, char *b)
+{
+int cmp=strcmp(a,b);
+if (cmp<0) return(-1);
+if (cmp>0) return(1);
+return(0);
+}
+
+
 static int zct;
 
 TAG::TAG()	// This is the 'implicit' TAG constructor (no parameter passed to constructor)
@@ -630,10 +645,10 @@ TAG::TAG()	// This is the 'implicit' TAG constructor (no parameter passed to con
 if (log)
 	{
 	id=++zct;
-if (id==32)
+if (id==18)
 {
 //assert(0);
-id=32;						// run to cursor HERE to Find when class_leak 'id' was instantiated
+if (zct<0) exit(9);				// run to cursor HERE to Find when class_leak 'id' was instantiated
 }
 	void *ptr=(void*)this;
 	log->put(&ptr);
@@ -712,39 +727,6 @@ if (lk.classes!=0 || lk.files!=0 || lk.memblocks!=0)
 	}
 return(NO);
 }
-
-/*
-NAMBAG::NAMBAG()
-{
-d=new DYNAG(sizeof(int16_t));
-}
-
-NAMBAG::~NAMBAG()
-{
-memtake(ad);
-delete d;
-}
-
-int NAMBAG::put(const char *s)  // find or add 's' and return its subscript
-{
-int i;
-for (i=0;i<d->ct;i++)
-    if (!strcmp(s,get(i))) return(i); // string already present
-d->put(&sz);
-int len=strlen(s)+1;
-ad=(char*)memrealloc(ad,sz+len);
-strcpy(&ad[sz],s);
-sz+=len;
-return(i);  // returns subscript of newly-appended final string
-}
-
-const char*NAMBAG::get(int i)   // return ptr to stored string element 'i'
-{
-return(&ad[*((int16_t*)d->get(i))]);
-}
-*/
-
-//struct TUPLE {char *name, *value;};
 
 DYNTUPLE::DYNTUPLE()
 {

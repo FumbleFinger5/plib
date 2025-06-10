@@ -1,9 +1,9 @@
 #include <assert.h>
-// second line added just to see if GIT notices
 #include <stdlib.h>
 #include <malloc.h>
 #include <string.h>
 #include <cstdarg>
+#include <unistd.h>
 
 #include "pdef.h"
 #include "db.h"
@@ -12,16 +12,6 @@
 #include "str.h"
 #include "drinfo.h"
 #include "log.h"
-
-
-//========
-#include <unistd.h>
-//#include <sys/wait.h>
-//#include <stdio.h>
-//#include <utime.h>
-
-//#include <time.h>
-//===========
 
 static void bkysetpos(int last);
 static short bkynxtkey(RHDL *rhdl, void *key);
@@ -1729,6 +1719,9 @@ int bkyupd(HDL h_btr, RHDL rhdl, void *key)
 	return (NO);
 }
 
+HDL btr_get_db(HDL h_btr) {return(((BTR*)h_btr)->h_db);}
+int btr_get_keysiz(HDL h_btr) {return(((BTR*)h_btr)->keysiz);}
+
 // 'rhdl' can be passed as NULLPTR, but normally is a ptr, 'cos there's
 // usually an associated record, and we need the rhdl to be filled as we
 // delete the key, so we know the associated record to delete.
@@ -1871,14 +1864,13 @@ int bkyscn_all(HDL btr, RHDL *rhdl, void *key, int *again)
 }
 
 // We ALWAYS need 'key' to be passed here (I think)
-int bkysrch(HDL h_btr, int mode, RHDL *rhdl, void *key)
+bool bkysrch(HDL h_btr, int mode, RHDL *rhdl, void *key)
 {
-	int ok;
-	btrbind(h_btr);
-	ok = bkyfnd(key);
-	if (ok && ABS(mode) < 2)
-		btrakeyret(rhdl, key);
-	switch (mode)
+btrbind(h_btr);
+int ok = bkyfnd(key);
+if (ok && ABS(mode) < 2)
+	btrakeyret(rhdl, key);
+switch (mode)
 	{
 	case BK_LT:
 		*_btr_flg |= BK_PRCD;
@@ -1898,9 +1890,9 @@ int bkysrch(HDL h_btr, int mode, RHDL *rhdl, void *key)
 		ok = bkynxtkey(rhdl, key);
 		break;
 	}
-	if (ok)
-		*_btr_flg &= ~BK_PRCD;
-	return (ok);
+if (ok)
+	*_btr_flg &= ~BK_PRCD;
+return (ok!=0);
 }
 
 RHDL btrist(HDL h_db, int key_typ, int key_siz)
@@ -2016,7 +2008,7 @@ return(YES);
 // All databases have Db_IS_CLEAN at offset Db_DIRTYPOS ('xc' contains "(c) Softworks 1992")
 // which would have been written at start of the file when it was created.
 // Database safety ON (DbSafe_Catch==DB_IS_DIRTY), tells FlOpen() it's a DBF file,
-// making flput() change this byte to DB_IS_DIRTY when FIRST called, and flclose()
+// making flput() change this byte to DB_IS_DIRTY when FIRST called, and flClose()
 // change it back to DB_IS_CLEAN when we close the file under program control.
 // If this flag byte isn't DB_IS_CLEAN when we open the file, we're obviously in
 // deep doo-doo's, but we'll keep a 'back-door' Alt/Fn9 in dbcorrupt().

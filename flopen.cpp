@@ -372,7 +372,8 @@ if (*((char*)str)) flput((char*)str,strlen((char*)str),f);
 void flputln(const void *s, HDL f)
 {
 flputs(s,f);
-flput("\r\n", 2, f);
+//flput("\r\n", 2, f);
+flput("\n", 1, f);
 }
 
 long flseek(HDL h_fl, long lpos, int mode)	// mode 0/1/2 = from BEG/CUR/END

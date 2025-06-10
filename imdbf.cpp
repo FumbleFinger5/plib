@@ -92,7 +92,7 @@ return(op);
 }
 
 
-void IMDB_FLD::getkey(char fld_id)
+void IMDB_FLD::getkey(char fld_id)  // activate this field-id (sets/reads kY and rH)
 {
 *((int64_t*)&kY) = fld_id;
 if (!bkysrch(fld_btr,BK_EQ,&rH,&kY)) m_finish("fld_id:%c (%d) - no record",fld_id,fld_id);
@@ -121,28 +121,6 @@ for (i=0;i<ct;i++)
 memtake(ii);
 }
 
-#ifdef UNUSED
-#include <lz4.h>
-// Function to decompress data compressed with LZ4_compress_default
-// Returns a pointer to a newly allocated buffer containing the decompressed data
-// *op_originalSize is the original (uncompressed) size of the data
-// The input compressed data is in ip_compressedBuffer, and its size is ip_compressedSize
-char *decompress(const char *ip_buf, int ip_size, int *op_size)
-{
-char *op_buf = (char*)memgive(*op_size);
-int sz=LZ4_decompress_safe(ip_buf, op_buf, ip_size, *op_size);
-if (sz!=*op_size) m_finish("LZ4 Error!");
-return(op_buf);
-}
-char *compress(const char *ip_buf, int ip_bytes, int *op_bytes)
-{
-char* op_buf = (char*) memgive(*op_bytes = LZ4_compressBound(ip_bytes));
-*op_bytes = LZ4_compress_default(ip_buf, op_buf, ip_bytes, *op_bytes);
-if (*op_bytes <= 0) m_finish("LZ4 error!");
-return((char*)memrealloc(op_buf, *op_bytes));
-}
-#endif
-
 void IMDB_FLD::load_fctl(FCTL *f)
 {
 getkey(f->id);
@@ -155,29 +133,6 @@ if (f->id==FID_CAST || f->id==FID_DIRECTOR)
 
 if (f->id==FID_GENRE || f->id==FID_TITLE || f->id==FID_CAST || f->id==FID_DIRECTOR)
     f->pa = new DYNAG(db,kY.rhav);
-
-#ifdef ghfghgfh
-if (f->id==FID_CAST)
-{
-DYNAG *d=(DYNAG*)f->pa;
-uchar *p=(uchar*)d->get(0);
-int i,j, tsz=d->total_size();
-
-HDL f=flopen("t.c","w"); flput(p,tsz,f); flclose(f);
-
-int *tt=(int*)memgive(256*sizeof(int));
-printf("tsz:%d  \n",tsz);
-for (i=0;i<tsz;i++)
-    tt[p[i]]++;
-for (i=j=0;i<256; j+=tt[i++])
-    if (tt[i]) printf("%3d  %d\n",i,tt[i]);
-printf("ToTAL:%d  \n",j);
-for (i=0;i<d->ct;i++)
-    {char *nm=(char*)d->get(i); if (stridxc((char)195,nm)!=NOTFND) printf("%s\n",nm);}
-memtake(tt);
-}
-#endif
-
 if (f->ph==NULL && f->pa==NULL) m_finish("Unknown Fld-ID:%c (Ascii:%d)",f->id,f->id);
 }
 
@@ -235,7 +190,7 @@ if (kyupd) bkyupd(fld_btr, rH, &kY);
 memtake(im);
 }
 
-bool IMDB_FLD::put2a(char *str)  // Add GENRE value for new movie
+bool IMDB_FLD::put2a(const char *str)  // Add GENRE value for new movie
 {
 bool kyupd=false;
 DYNAG t(db,kY.rhav);      // NewConstructor   -   Find or add THIS fldvalue (in 'str') to allv
@@ -251,7 +206,7 @@ if (t.total_size()>prv_t_sz)
 return(kyupd);
 }
 
-DYNAG *make_cast_table(char *str)
+DYNAG *make_cast_table(const char *str)
 {
 DYNAG *t=new DYNAG(0);
 while (*str)
@@ -272,7 +227,7 @@ return(t);
 }
 
 
-bool IMDB_FLD::put2b(char *str)  // Add CAST value for new movie
+bool IMDB_FLD::put2b(const char *str)  // Add CAST value for new movie
 {
 bool    kyupd=false;
 int     i, tc_ct;
@@ -292,11 +247,11 @@ tx.put(subs);
 rH=zrecadd_or_upd(db,rH, tx.get(0), tx.total_size(), &kyupd); // rewrite xlt values with THIS movie extra one at end
 
 if (tc_ct!=tc.ct)   // We must have added 1 or more actors to the master table
-    kY.rhav=zrecadd_or_upd(db,kY.rhav,tc.get(0),tc.total_size(), &kyupd);       // compress HERE
+    kY.rhav=zrecadd_or_upd(db,kY.rhav,tc.get(0),tc.total_size(), &kyupd);
 return(kyupd);
 }
 
-bool IMDB_FLD::put2c(char *str)  // Add 1-byte rh value
+bool IMDB_FLD::put2c(const char *str)  // Add 1-byte rh value
 {
 bool kyupd=false;
 if (kY.fid==FID_RUNTIME)
@@ -321,21 +276,21 @@ else
 return(kyupd);
 }
 
-// Passed buffer here is as returned by the api call (all records in imdb.dbf should also be in imdb.api)
+// Passed buffer here is as returned by the api call (all records in imdb.dbf should also be in imdb.Api)
 // First add imno to the master table, then add each indexed field
 void IMDB_FLD::put(int32_t imno, const char *buf)   // Add a new movie
 {
 char fid;
 bool kyupd;
-char str[128], *ptr;
+char str[128];
 put_imno(imno);     // Appends THIS movie to end of master list (and adds to memory-based table 'imx')
+JSS4 jss4;
 json_object *parser = json_tokener_parse(buf);
-
 for (int i=1; (fid=idx_fid[i])!=0; i++)       // start at 1, not 0 (imno already done)
     {
     getkey(fid);    // ensures kY matches THIS fid, so each different put??() call know what it's doing
     const char *fld_name=get_fld_name(idx_fid[i]);
-    ptr=jstr4(parser, fld_name);   // return ptr-> (alloc'd) copy of named metric string
+    const char *ptr=jss4.get(parser, fld_name);   // return ptr-> (alloc'd) copy of named metric string
     switch (fid)
         {
         case FID_RUNTIME:
@@ -358,7 +313,6 @@ for (int i=1; (fid=idx_fid[i])!=0; i++)       // start at 1, not 0 (imno already
     if (kyupd && !bkyupd(fld_btr,rH,&kY)) m_finish("bkyupd failed!");
     }
 json_object_put(parser); // Clean up
-strquote(0,0);
 }
 
 bool IMDB_FLD::del2a(char fld_id, int xlt)
@@ -464,7 +418,7 @@ memtake(im);
 char fid;
 for (i=1; (fid=idx_fid[i])!=0; i++)     // Start from 1 (not 0) 'cos we already updated the master table above 
     {
-    getkey(fid=idx_fid[i]);
+    getkey(fid=idx_fid[i]); // ?????????????????????? already assigned in loop above!
     switch (fid)
         {
         case FID_YEAR:
@@ -489,6 +443,37 @@ for (i=1; (fid=idx_fid[i])!=0; i++)     // Start from 1 (not 0) 'cos we already 
 return(true);
 }
 
-IMDB_FLD::~IMDB_FLD() {delete imx; dbsafeclose(db);}
+IMDB_FLD::~IMDB_FLD()
+{
+delete imx; dbsafeclose(db);
+}
 
+bool IMDB_FLD::upd(DYNAG *avd)
+{
+bool kyupd=false;
+getkey(FID_TITLE);
+kY.rhav=zrecadd_or_upd(db,kY.rhav,avd->get(0),avd->total_size(),&kyupd);
+if (kyupd)
+   bkyupd(fld_btr, rH, &kY);
+return(kyupd);
+}
 
+bool IMDB_FLD::upd_title(int32_t imno, const char *title)
+{
+IMN2XLT ix={imno,0};
+int n=imx->in(&ix);                             // n=position in "all known imnos" primary list
+if (n==NOTFND) m_finish("Error amending tt%d",imno);
+int xlt=((IMN2XLT*)imx->get(n))->xlt;           // xlt=position in "all values" indirection list by field-id
+getkey(FID_TITLE);                              // set kY and rH
+DYNAG *avd = new DYNAG(db,kY.rhav);
+short *im=(short*)load_rH(sizeof(short), 0);    // allocates "indirection array", which must be released
+int sub=im[xlt];
+memtake(im);
+avd->del(sub);
+avd->put(title,sub);
+bool kyupd=false;
+kY.rhav=zrecadd_or_upd(db,kY.rhav,avd->get(0),avd->total_size(),&kyupd);
+if (kyupd)
+   bkyupd(fld_btr, rH, &kY);
+return(true);
+}

@@ -144,7 +144,7 @@ if (f)
 
 void RECENT::put(int32_t imno)
 {
-char s[256];
+char wrk[256];
 HDL f=flopen(fn, "w");
 if (f==0) m_finish("Can't write %s",fn);
 int i=tbl->in(&imno);
@@ -152,18 +152,20 @@ if (i!=NOTFND) tbl->del(i);
 tbl->put(&imno,0);
 for (int i=0; i<tbl->ct; i++)
     {
-    flputln(strfmt(s,"%d",*(int32_t*)tbl->get(i)),f);
+    flputln(strfmt(wrk,"%d",*(int32_t*)tbl->get(i)),f);
     }
 flclose(f);
 }
 
 int RECENT::pos(int32_t imno)
 {
-for (int i=0; i<tbl->ct; i++)
-    if (*(int32_t*)tbl->get(i) == imno) return(i);
-return(255);
+int i;
+for (i=0; i<tbl->ct; i++)
+    if (*(int32_t*)tbl->get(i) == imno) break;
+return(i);                                      // Every movie not in table gets the same "hi-value"
 }
 
+// TODO limit to 800 calls per 24 hours (gets throttled if > 1000 in a day)
 const char *apikey()
 {
 static char ky[40];
@@ -186,6 +188,7 @@ if (!*strncpy(buf,pm.get(setting), 127))
 return(buf);
 }
 
+int tapikey_throttle_force;
 
 const char *tapikey(int throttle)
 {
@@ -200,8 +203,8 @@ if (!ky[0])
     if (p==NULL || !p[0]) p=(char*)k[0];
     strancpy(ky,p,sizeof(ky));              // ALWAYS outputs string terminating EOS null byte
     }
-if (throttle)   // limit to 25 calls per second by just sleeping until it's time to return the value
-    {
+if (throttle || tapikey_throttle_force)
+    {       // limit to 25 calls per second by just sleeping until it's time to return the value
     if (throttle==NOTFND) {SCRAP(tmr); return(NULL);}
     if (tmr==NULL) tmr=tmrist(0);
     while (tmrelapsed(tmr)<2) usleep(10000);   // 1,000,000 microseconds = 1 second
@@ -217,9 +220,9 @@ PARM parm;
 strcpy(fn,parm.get(base_filename));
 if (!fn[0]) {sjhlog("No configured path for %s",base_filename); throw(102);}
 
-int sub=stridxc('$',fn);
-if (sub!=NOTFND && ISDIGIT(fn[sub+1]))
-    {
+int sub=stridxc('$',fn);                  // $1 and $2 are "Live" (dropbox) and "Dev" (local test folder)  
+if (sub!=NOTFND && ISDIGIT(fn[sub+1]))    // All the actual database paths are specified as $1
+    {                                     // q3 context menu offers Restart LIVE/DEV (after SWAPPING $1 & $2) 
     const char *k;
     char ks[3];
     k=parm.get(strancpy(ks,&fn[sub],3));    // strancpy "$n" + EOS nullbyte to sought param-name
@@ -232,3 +235,67 @@ strendfmt(fn,"%s",base_filename);
 return(fn);
 }
 
+static char *geometry_param_name(const char *app_name)
+{static char wrk[32]; return(strfmt(wrk,"%s_geometry",app_name));}
+
+static void gw_geometry_get(const char *app_name, GW_GEOMETRY *geom)
+{
+PARM pm;
+char w[64];
+strancpy(w,pm.get(geometry_param_name(app_name)),sizeof(w));
+//sjhlog("ProgStart, apply previously saved geometry:%s",w);
+if (*w)
+   {
+   strendfmt(w,"%c",COMMA);
+   int i, n;
+   for (i=0;i<5;i++)
+      {
+      n=a2i(w,0);
+      if (a2err_char!=COMMA || n>10000 || n<0) break;
+      if (i==0) geom->x=n;
+      if (i==1) geom->y=n;
+      if (i==2) geom->w=n;
+      if (i==3) geom->h=n;
+      if (i==4) geom->m=n;
+      strdel(w,stridxc(COMMA,w)+1);
+      }
+   if (i==5) return;
+   sjhlog("ERROR! %s geometry:%d,%d,%d,%d,%d",app_name, geom->x,geom->y,geom->w,geom->h,geom->m);
+   }
+geom->x = geom->y = geom->m = 0;
+geom->w=800;
+geom->h=600;
+//sjhlog("No saved geometry for %s",app_name);
+}
+
+GET_SET_GEOMETRY::GET_SET_GEOMETRY(const char *app_name, GtkWidget *window)   // constructor applies SAVED geometry from last run
+{
+appName = app_name;
+gtkWindow = GTK_WINDOW(window);
+gw_geometry_get(appName, &geom);
+if (geom.m != 0)
+    gtk_window_maximize(gtkWindow);
+else
+    {
+    gtk_window_move(gtkWindow, geom.x, geom.y);
+//    gtk_window_set_default_size(gtkWindow, geom.w, geom.h);
+    gtk_window_resize(gtkWindow, geom.w, geom.h);
+    }
+gtk_widget_show_all(window);
+}
+
+void GET_SET_GEOMETRY::save()
+{
+if (gtk_window_is_maximized(gtkWindow))
+   geom.m = 1;
+else
+   {
+   geom.m = 0;
+   gtk_window_get_position(gtkWindow, &geom.x, &geom.y);
+   gtk_window_get_size(gtkWindow, &geom.w, &geom.h);
+   }
+char wrk[64];
+strfmt(wrk, "%d,%d,%d,%d,%d", geom.x, geom.y, geom.w, geom.h, geom.m);
+PARM pm;
+pm.set(geometry_param_name(appName), wrk);
+}
