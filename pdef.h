@@ -31,27 +31,24 @@ typedef	uint32_t	RHDL;	// database record handle WAS 'long''
 #define NO      0
 #define NOTFND  -1
 
-//	Some useful macros
-//	General defines used almost everywhere
-
 #define	AMPERSAND		38
 #define	BACKSLASH		92      // backslash \ as in escape sequences
 #define	CHR_SLASH	   	47      // forward slash / as in paths
 #define	BKSP	8
 #define	BIGLONG	0x7fffffff
-#define	CHR_HASH	35
-#define	CHR_DASH	45
-#define	CHR_QTSINGLE	39
+#define	CHR_HASH	    35
+#define	CHR_DASH	    45
+#define	CHR_QTSINGLE	39  // 0x27
 #define	CHR_QTDOUBLE	34
-#define	COLON				58
+#define	COLON			58  // 0x3A
 #define	COMMA	','
 #define	CPMEOF  0x1A		// <ctl-z> byte for eof in text files
-#define	CRET    '\r'		// 13
+#define	CRET    '\r'	// 13
 #define  EQUALS '='
 #define	ESC		27
 #define	SEMICOLON	';'
 #define	SPACE	' '
-#define	LNFEED   '\n'		// 10
+#define	LNFEED   '\n'	// 10
 #define	PLUS	'+'
 #define	TAB			'\t'
 

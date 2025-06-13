@@ -142,9 +142,17 @@ return(true);
 
 bool omdb_all_from_name(const char *name, int year, char *buf8k)
 {
-char cmd[256];
-strfmt(cmd,"%s%s%s%s","curl 'https://www.omdbapi.com/?apikey=", apikey(), "&t=\"", name);
-strendfmt(cmd,"\"&y=%d' %s",year, STD_ERRNULL);
+char cmd[256], ucn[128];    // URL_compiant_name
+
+strcpy(ucn,name);
+strxlt(ucn,SPACE,'+');
+escape_ampersand(ucn);
+char *p;
+//while ((p=strchr(ucn,CHR_QTSINGLE))!=NULL) strins(strdel(p,1),"%27");
+//while ((p=strchr(ucn,AMPERSAND))!=NULL) strins(strdel(p,1),"%26");
+
+strfmt(cmd,"%s%s%s%s","curl 'https://www.omdbapi.com/?apikey=", apikey(), "&t=", ucn);
+strendfmt(cmd,"&y=%d' %s",year, STD_ERRNULL);
 int err=exec_cmd(cmd, buf8k, 8192);
 //sjhlog("%s:%d\n%s","Api_all_from_name",err,cmd);
 // IF buffer contains "Incorrect IMDb ID." THEN call themoviedb instead

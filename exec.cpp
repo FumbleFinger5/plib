@@ -203,3 +203,33 @@ if (statusflag!=0)
 	}
 }
 
+#include <iostream>
+#include <cstring>
+#include <curl/curl.h>
+
+static char *easy_escape(char *dst, const char *src)
+{
+CURL *curl = curl_easy_init();
+if (!curl) m_finish("Failed to initialize libcurl");
+char *cstr=curl_easy_escape(curl,src,0);
+strcpy(dst,cstr);
+curl_free(cstr);
+curl_easy_cleanup(curl);
+return(dst);
+}
+
+static void easy_escape_in_situ(char *parm)
+{
+const char *tmp=stradup(parm);
+easy_escape(parm,tmp);
+memtake(tmp);
+}
+
+void escape_ampersand(char *s)	// replace every occurence of "&" with "&amp;" and make URL-compliant
+{
+int p;
+while ((p=stridxc('&',s))!=NOTFND) s[p]='\t';
+while ((p=stridxc('\t',s))!=NOTFND) strins(strdel(&s[p],1),"&amp;");
+//while ((p=stridxc(CHR_QTSINGLE,s))!=NOTFND) strins(strdel(&s[p],1),"%27");
+easy_escape_in_situ(s);
+}

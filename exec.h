@@ -19,3 +19,4 @@ void visit_imdb_webpage(int32_t imno);
 /// Rename fully-qualified file or folder OR MOVE IT. Crash if any error.
 void exec_rename(const char *from, const char *to);
 
+void escape_ampersand(char *s);	// replace every occurence of "&" with "&amp;" THEN make URL-encoded in-situ
