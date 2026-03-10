@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <sys/statvfs.h>
+#include <utime.h>
 
 #include "pdef.h"
 #include "str.h"
@@ -152,9 +153,20 @@ fi->dttm=sb.st_mtime;		// Aug21 - Needs converting from time_t to cal format
 return true;
 }
 
+bool dr_set_dttm(const char *path, int32_t dttm)   // set access AND modification time of file to passed dttm
+{
+struct utimbuf udttm;
+udttm.actime = static_cast<time_t>(dttm);  // Set access time
+udttm.modtime = static_cast<time_t>(dttm); // Set modification time
+if (utime(path, &udttm) == 0) return(true);
+sjhlog("%s udttm error",path);
+return(false);
+}
+
+
 int megabytes(int64_t size) {return(size >> 20);}  // DON'T USE! Just use size/1000000
 
-uint64_t get_free_space(const char *path)    // free dspace in bytes of drive containing 'path' (dir/file)
+uint64_t dr_free_space(const char *path)    // free dspace in bytes of drive containing 'path' (dir/file)
 {
 struct statvfs buf;
 if (statvfs(path, &buf) != 0) sjhlog("statvfs failed for %s\n",path);
@@ -168,27 +180,6 @@ bool ok=drinfo(path,&fi);
 if (ok && attr) *attr=fi.attr;
 return ok;
 }
-
-
-/*
-Ulong drdsksp(char drive)
-{
-ULARGE_INTEGER
-	FreeBytesAvailable,     // bytes available to caller
-	TotalNumberOfBytes,     // bytes on disc
-	TotalNumberOfFreeBytes; // free bytes on disc
-int drv=TOUPPER(drive);
-assert(drv>='A' && drv<='Z');
-char dir[3]={drv,':',0};
-if (GetDiskFreeSpaceEx(dir,&FreeBytesAvailable,&TotalNumberOfBytes,&TotalNumberOfFreeBytes))
-	 return(FreeBytesAvailable.LowPart);
-return(0);
-}
-*/
-
-//static char* get_filename_offset(char *path, const char *dflt_path)
-//{return(strend(strcat(drfullpath(path,*path?path:dflt_path),"/")));}
-
 
 int drisdir(const char *directory_path)	// YES/NO - is path a directory?
 {
@@ -214,6 +205,8 @@ if (strcasestr(n,"YIFYStatus")!=0) return(true);
 if (stridxs("Xclusive",n)!=NOTFND) return(true);
 if (stridxs("PublicHD",n)!=NOTFND) return(true);
 if (strcasestr(n,"torrentgalaxy")!=0) return(true);
+if (strcasestr(n,"YTSProx")!=0) return(true);
+if (strcasestr(n,"sample")!=0) return(true);
 if (strcasestr(n,"yify")!=0 && SAME4BYTES(drext(n),".jpg")) return(true);
 return(false);
 }

@@ -8,6 +8,7 @@
 #include "cal.h"
 #include "memgive.h"
 #include "str.h"
+#include "log.h"
 
 
 char *cal2VbDate(int32_t cal)
@@ -121,6 +122,21 @@ else return(DAY_SECS*(365L*yr+NLEAPS(yr)+day+_mth_tab(mth,cyr)-1L)
 return(0);
 }
 
+int32_t	caljoinBST(int yr,int mth,int day,int hr,int mi,int sc)
+{
+if (yr<=38) yr+=100;    // NOT the same as my stuff!
+struct tm t={};
+t.tm_year=yr;
+t.tm_mon=mth-1;
+t.tm_mday=day;
+t.tm_hour=hr;
+t.tm_min=mi;
+t.tm_sec=sc;
+t.tm_isdst=NOTFND;         // Currently don't know if BsT applies to this dttm
+time_t UTCdttm=mktime(&t);   // 4-byte int is the same as datatype 'time_t'
+return((int32_t)UTCdttm);
+}
+
 int32_t	calnow(void)
 {
 time_t t;
@@ -156,7 +172,7 @@ if (pday) *pday=(short)(day+1-_mth_tab(mth,yr));
 
 void cal_check_date_range(short bd0, short bd1)
 {
-if (bd1<bd0 || bd0<BD1980) SetErrorText("Internal Error: m_finishBad Date Range");
+if (bd1<bd0 || bd0<BD1980) SJHLOG("Internal Error: m_finishBad Date Range");
 }
 
 #include <sys/time.h>
@@ -219,7 +235,7 @@ static int month(const char *m)
 {
 while (m[0]==' ') m++;
 int i, j, e;
-for (e=0; m[e]; e++) if (m[e]<=' ' || m[e]==CHR_QTSINGLE) break;
+for (e=0; m[e]; e++) if (m[e]<=' ' || m[e]==QTSINGLE) break;
 if (e<3) return(0);
 for (i=0;i<12;i++)
 	{
@@ -256,7 +272,7 @@ while (ISDIGIT(p[0])) p++;
 while (p[0]==' ') p++;
 m=month(p);
 if (!m) return(0);
-if (p[3]==CHR_QTSINGLE) y=2000+a2i(&p[4],2);
+if (p[3]==QTSINGLE) y=2000+a2i(&p[4],2);
 else
 	{
 	while (p[0]!=' ') p++;	// step over "month" (full mthname, or 1st 3 chars)
@@ -335,8 +351,8 @@ return calfmt(hm[i++&3],"%02T%02I",dttm);
 
 
 char	*dmy_str(int32_t bd)			// Consecutively uses one of 4 static areas
-{									// for formatting, so one print() statement
-static int sw=0;					// can have include up to 4 dates in 1 call
+{								      	// for formatting, so one print() statement
+static int sw=0;					   // can include up to 4 dates in 1 call
 static char dmy[4][9];
 return(calfmt(dmy[sw++&3],"%02D%02O%02Y",bd));
 }
@@ -348,6 +364,14 @@ static char dmy[4][15];
 return(strfmt(dmy[sw++&3],"%s %s",dmy_str(dttm),hm_str(dttm)));
 }
 
+char	*dmy_hms_str(int32_t dttm)		// Consecutively uses one of 4 static areas
+{									// for formatting, so one print() statement
+static int sw=0;					// can have include up to 4 dates in 1 call
+static char dmy[4][18];
+short se;
+calsplit(dttm, 0, 0, 0, 0, 0, &se);
+return(strfmt(dmy[sw++&3],"%s_%s%02d",dmy_str(dttm),hm_str(dttm),se));
+}
 
 char	*dmy_stri(short bd)
 {return(dmy_str(long_bd(bd)));}
@@ -377,6 +401,18 @@ fail:
 return(SE_DATE);
 }
 
+int32_t utc2BST(int32_t utc_dttm) // just return the passed value - PLUS 3600 if BsT applies
+{
+time_t t_val = utc_dttm; // Cast int32_t to time_t for standard function
+struct tm local_time_info;
+if (localtime_r(&t_val, &local_time_info)!=NULL  &&  local_time_info.tm_isdst > 0) return utc_dttm + 3600;
+return utc_dttm; // No BsT offset
+}
+
+char  *dmy_hms_BST(int32_t dttm_UTC)  // Show the time as ONE HOUR LATER if BsT would apply to it
+{
+return(dmy_hms_str(utc2BST(dttm_UTC)));
+}
 
 bool valid_movie_year(int yr)
 {

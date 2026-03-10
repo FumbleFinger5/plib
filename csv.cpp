@@ -5,7 +5,7 @@
 #include "memgive.h"
 #include "str.h"
 #include "flopen.h"
-#include "smdb.h"
+//#include "smdb.h"
 #include "csv.h"
 #include "cal.h"
 #include "log.h"
@@ -353,8 +353,8 @@ for (cc=w; *cc!=0; cc=add_actor(a,cc)) {;}
 }
 
 
-int _cdecl cp_namct(NAMCT *a, NAMCT *b) {return(cp_short(&a->ct, &b->ct));}
-int _cdecl cp_str(char *a, char *b)
+int cp_namct(NAMCT *a, NAMCT *b) {return(cp_short(&a->ct, &b->ct));}
+int cp_str(char *a, char *b)
 {
 int cmp=strcmp(a,b);
 if (cmp<0) return(-1);

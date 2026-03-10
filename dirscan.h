@@ -3,7 +3,7 @@ class DIRSCAN {
 public:
 DIRSCAN(const char *pth, const char *msk=NULL);
 ~DIRSCAN();
-struct dirent *next(FILEINFO *fi=0);	// If !=0 use stat() for fi->size AND put FULLPATH into fi->name
+struct dirent *next(FILEINFO *fi=0);	// If !=0 use lstat() for fi->size AND put FULLPATH into fi->name
 private:
 DIR     *dir;
 struct dirent *entry;	// member 'd_type' contains flagbits as below
@@ -32,7 +32,7 @@ if (type_filter_unwanted!=0 && (type_filter_unwanted&entry->d_type)!=0) continue
 bool fn_cdx(const char *n);		// Check if video filename ends with "CDn" for multi-part movie.
 
 // Simple class to load directory contents into a DYNTBL
-class DIRTBL : public DYNAG	 {  // subclass of DYNAG - returns JUST filename - not FULLPATH
+class DIRTBL : public DYNAG	 {  // subclass of DYNAG - returns FILEINFO (containing JUST filename - not FULLPATH)
 public:
 DIRTBL	(const char *pth);
 private:

@@ -127,9 +127,8 @@ struct BTR
 		depth;			   // current search depth
 	PFI_v_v cmppart;	   // Comparator function (maybe app-supplied)
 						   //#ifdef DB_VERIFY
-	char *(_cdecl *formatter)(short prm, void *key);
+	char *(*formatter)(short prm, void *key);
 	short formatter_parm;
-	//#endif
 	char actv_key[8]; // Actually, the key itself goes here, followed
 };					  // by space for 2 RHDL's ( - why not just one?)
 
@@ -189,44 +188,40 @@ int dbsafe_catch;
 #define BTRPSHNODE(rhnode) _h_btr->rh_node[++(_h_btr->depth)] = rhnode
 #define BTRPOPNODE ((_h_btr->depth > 0) ? _h_btr->rh_node[_h_btr->depth--] : NULLRHDL)
 #define BTRSTKLVL(dpth) (((dpth) > 0) ? _h_btr->rh_node[(dpth)] : NULLRHDL)
-#define RHDLIST(p, c) ((RHDL)(((Ulong)(p) << N_IDBITS) | ((Ulong)(c)&RH_IDMASK)))
+#define RHDLIST(p, c) ((RHDL)(((uint32_t)(p) << N_IDBITS) | ((uint32_t)(c)&RH_IDMASK)))
 #define BNDKEY(b, p) (b->keys + (((p)-1) * _btr_ksz4))
 #define BNDRHDL(b, p) *((RHDL *)(b->keys + ((p)*_btr_ksz4 - 4)))
 
 #pragma pack(push, 1)
 struct PGMAPS
-{
+   {
 	RHDL rh_pgmap;
 	int32_t tot_free; // SJH 04/05/04 - This needs checking out - it's not being properly maintained
-};
+   };
 
 struct MAPMAP
-{
+   {
 	short nmaps, pgs_in_db;
 	PGMAPS pgmaps[MAXPGMAPS]; // limits database size to 100Mb
-};
+   };
 #pragma pack(pop)
 
 static MAPMAP *_mapmap;
 static HDL _h_db;
 
 DB
-{
+   {
 	HDL h_nxtdb, h_prvdb;
 	HDL h_db_fl, btrs;
 	MAPMAP mapmap;
 	ushort db_flg; // 1=new pages, 2=Read Only, 4=No Rebalance in Del
-				   //	ushort	pgsz;
 	char db_fnam[1];
-};
+   };
 
 DLRING { DLRING *nxt, *prv; };
-//static  HDL	_h_btr;
 static BTR *_h_btr;
 static HDL _dbt;
 static HDL _dbfil;
-
-static int _pgsz;
 
 static int _lock; // ,failsafe;
 
@@ -290,33 +285,33 @@ static void memtakelist(void *plist)
     to NULL if this was the only element in the ring. */
 static void *dlrsnap(DLRING *phd, DLRING *pelm)
 {
-	if (phd)
+if (phd)
 	{
-		if (phd == pelm && (phd = pelm->nxt) == pelm)
-			phd = 0; /* PELM only elm in ring */
-		if (pelm)
+	if (phd == pelm && (phd = pelm->nxt) == pelm)
+		phd = 0; /* PELM only elm in ring */
+	if (pelm)
 		{
-			pelm->nxt->prv = pelm->prv;
-			pelm->prv->nxt = pelm->nxt;
-			pelm->nxt = pelm->prv = pelm;
+		pelm->nxt->prv = pelm->prv;
+		pelm->prv->nxt = pelm->nxt;
+		pelm->nxt = pelm->prv = pelm;
 		}
 	}
-	return (phd);
+return (phd);
 }
 
 //	Link in a new element at the head of the ring.  This element must not currently be part of the ring.
 //	phd==NULL if the ring is currently empty.
 static void *dlrlink(DLRING *phd, DLRING *ins)
 {
-	if (phd)
+if (phd)
 	{
-		phd->prv->nxt = ins;
-		ins->nxt = phd;
-		ins->prv = phd->prv;
-		phd->prv = ins;
-		return (phd);
+	phd->prv->nxt = ins;
+	ins->nxt = phd;
+	ins->prv = phd->prv;
+	phd->prv = ins;
+	return (phd);
 	}
-	return (ins->nxt = ins->prv = ins);
+return (ins->nxt = ins->prv = ins);
 }
 
 //	Moves an element already in this ring to become head of the ring.  (good for LRU algorithms.)
@@ -324,32 +319,32 @@ static void *dlrlink(DLRING *phd, DLRING *ins)
 //	then the head of the ring is changed to the moved element. The old first elm is now the second, etc.
 static void *dlrtohd(DLRING *phd, DLRING *pelm)
 {
-	if (phd != pelm)
+if (phd != pelm)
 	{
-		dlrsnap(phd, pelm);
-		dlrlink(phd, pelm);
-		return (pelm); /* pelm is now head of ring */
+	dlrsnap(phd, pelm);
+	dlrlink(phd, pelm);
+	return (pelm); /* pelm is now head of ring */
 	}
-	return (phd);
+return (phd);
 }
 
 #ifdef dont_delete
 static void *dlrnxt(DLRING *phd, DLRING *pelm)
 {
-	DLRING *nxt;
-	if (phd)
+DLRING *nxt;
+if (phd)
 	{
-		if (pelm)
+	if (pelm)
 		{
-			if ((nxt = pelm->nxt) == phd)
-				nxt = 0;
+		if ((nxt = pelm->nxt) == phd)
+			nxt = 0;
 		}
-		else
-			nxt = phd; /* pelm==NULLHDL, first request for next */
+	else
+		nxt = phd; /* pelm==NULLHDL, first request for next */
 	}
 	else
 		nxt = 0; /* end of ring, ring is empty */
-	return (nxt);
+return (nxt);
 }
 #endif
 /////////// end of memtaker.c and dlr.c
@@ -366,86 +361,85 @@ static BUF *_bf_head, *_bf_addr;
 
 static void bfspist(int nbufs) // create a ring of doubly-linked
 {							   // Buffers (must be at least 4)
-	BUF *buf;
-	_bf_head = _bf_addr = buf = (BUF *)memgive(nbufs * sizeof(BUF)); // Make bufs contiguous
-	(buf->prv = &buf[nbufs - 1])->nxt = buf;
-	for (_bf_ct = 0; _bf_ct < nbufs; _bf_ct++)
+BUF *buf;
+_bf_head = _bf_addr = buf = (BUF *)memgive(nbufs * sizeof(BUF)); // Make bufs contiguous
+(buf->prv = &buf[nbufs - 1])->nxt = buf;
+for (_bf_ct = 0; _bf_ct < nbufs; _bf_ct++)
 	{
-		if (_bf_ct)
-			buf->prv = &_bf_addr[_bf_ct - 1];
-		if (_bf_ct < nbufs - 1)
-			buf->nxt = &_bf_addr[_bf_ct + 1];
-		buf->pg_in_buf = EMPTY;
-		buf->addr = (char *)memgive(PGSIZ);
-		buf++;
+	if (_bf_ct)
+		buf->prv = &_bf_addr[_bf_ct - 1];
+	if (_bf_ct < nbufs - 1)
+		buf->nxt = &_bf_addr[_bf_ct + 1];
+	buf->pg_in_buf = EMPTY;
+	buf->addr = (char *)memgive(PGSIZ);
+	buf++;
 	}
 }
 
 static void bfsprls(void)
 {
-	while (_bf_ct)
-		memtake(_bf_addr[--_bf_ct].addr);
-	Scrap(_bf_addr);
+while (_bf_ct)
+	memtake(_bf_addr[--_bf_ct].addr);
+Scrap(_bf_addr);
 }
 
 static void bftodisc(BUF *buf)
 {
-	if (buf->bflags & DIRTY_PG)
+if (buf->bflags & DIRTY_PG)
 	{
-		if (buf->pg_in_buf != EMPTY) // needs flushing
+	if (buf->pg_in_buf != EMPTY) // needs flushing
 		{
-			flputat(buf->addr, PGSIZ, (int32_t)(buf->pg_in_buf) * PGSIZ, buf->h_fl);
+		flputat(buf->addr, PGSIZ, (int32_t)(buf->pg_in_buf) * PGSIZ, buf->h_fl);
 		}
-		buf->bflags &= ~(HAS_NEWPG | DIRTY_PG); // Reset flags
+	buf->bflags &= ~(HAS_NEWPG | DIRTY_PG); // Reset flags
 	}
 }
 
 static BUF *bfsrch(int pg, int read) // Find/Read 'pg' in a Buffer
 {									 // Scan ring from current 'head'.
-	BUF *buf = _bf_head, *avail = 0; // If n/f, read in a free Buffer
-	short got = NO;					 // Move the Buffer we found (or read) to ring head
-	do
+BUF *buf = _bf_head, *avail = 0; // If n/f, read in a free Buffer
+short got = NO;					 // Move the Buffer we found (or read) to ring head
+do
 	{
-		if (buf->h_fl == _dbfil && buf->pg_in_buf == pg)
+	if (buf->h_fl == _dbfil && buf->pg_in_buf == pg)
 		{
-			got = YES;
-			break;
+		got = YES;
+		break;
 		}
-		if (!(buf->bflags & LOCKED))
-			avail = buf;
+	if (!(buf->bflags & LOCKED))
+		avail = buf;
 	} while ((buf = buf->nxt) != _bf_head);
-	if (!got) // didn't find this page already in a Buffer
+if (!got) // didn't find this page already in a Buffer
 	{		  // clean LRU Buffer so can read wanted page
-		if ((buf = avail) == 0)
-			throw SE_NOFREEBUFS; // all pages protectd!
-		bftodisc(buf);
-		buf->bflags &= ~LOCKED;
+	if ((buf = avail) == 0)
+		throw SE_NOFREEBUFS; // all pages protectd!
+	bftodisc(buf);
+	buf->bflags &= ~LOCKED;
 	}
-	_bf_head = (BUF *)dlrtohd((DLRING *)_bf_head, (DLRING *)buf); // the LRU algorithm!
-
-	if (!got && read) // this can only happen on what was a dbppgtomem() call
+_bf_head = (BUF *)dlrtohd((DLRING *)_bf_head, (DLRING *)buf); // the LRU algorithm!
+if (!got && read) // this can only happen on what was a dbppgtomem() call
 	{
-		if (pg >= _mapmap->pgs_in_db)
-			throw SE_BADPGID;
-		flgetat(buf->addr, PGSIZ, (int32_t)(buf->pg_in_buf = (ushort)pg) * PGSIZ, buf->h_fl = _dbfil);
-		buf->bflags &= ~(HAS_NEWPG | DIRTY_PG); // Reset flags
+	if (pg >= _mapmap->pgs_in_db)
+		throw SE_BADPGID;
+	flgetat(buf->addr, PGSIZ, (int32_t)(buf->pg_in_buf = (ushort)pg) * PGSIZ, buf->h_fl = _dbfil);
+	buf->bflags &= ~(HAS_NEWPG | DIRTY_PG); // Reset flags
 	}
-	return (buf); // return ptr-> found (or read in free) Buffer
+return (buf); // return ptr-> found (or read in free) Buffer
 }
 
 static void bffilflush(short bufrls)
 {
-	BUF *b = _bf_head;
-	do
+BUF *b = _bf_head;
+do
 	{
-		if (b->h_fl == _dbfil)
+	if (b->h_fl == _dbfil)
 		{
-			bftodisc(b);
-			if (bufrls)
+		bftodisc(b);
+		if (bufrls)
 			{
-				b->pg_in_buf = EMPTY;
-				b->h_fl = 0;
-				b->bflags = 0;
+			b->pg_in_buf = EMPTY;
+			b->h_fl = 0;
+			b->bflags = 0;
 			}
 		}
 	} while ((b = b->nxt) != _bf_head); /* do until back at head */
@@ -453,12 +447,12 @@ static void bffilflush(short bufrls)
 
 static int dbcmptcellsiz(int data_siz)
 {
-	int cell_siz = (data_siz & SIZPART) + (data_siz & 0x01); // Force even number
-	if (cell_siz < MINRECSIZ)
-		cell_siz = MINRECSIZ;
-	else if (cell_siz > MAXRECSIZ)
-		cell_siz = MAXRECSIZ;
-	return (cell_siz + sizeof(short)); /* add 2 for stored length */
+int cell_siz = (data_siz & SIZPART) + (data_siz & 0x01); // Force even number
+if (cell_siz < MINRECSIZ)
+	cell_siz = MINRECSIZ;
+else if (cell_siz > MAXRECSIZ)
+	cell_siz = MAXRECSIZ;
+return (cell_siz + sizeof(short)); /* add 2 for stored length */
 }
 
 /*
@@ -471,74 +465,72 @@ get the new cell id first, since that might snarf up some extra free space.  so 
 (the cell_id is the Vector entry) */
 static void dbpsetvars(PGVARS *pv, BUF *buf, short cell_id)
 {
-	int f_far, ofst;
-	ushort pve;
-	char *pg;
-	pv->buf = buf;
-	pv->cell_id = cell_id;
-	short *vector = DBPVECTOR(pg = pv->pg = buf->addr);
-	pv->celltbl = DBPCELLTBL(pg);
-	pve = *(pv->vector_elm = vector - cell_id);
-	if (pve == UNUSED_VECTOR || pve == RSVDID)
+int f_far, ofst;
+ushort pve;
+char *pg;
+pv->buf = buf;
+pv->cell_id = cell_id;
+short *vector = DBPVECTOR(pg = pv->pg = buf->addr);
+pv->celltbl = DBPCELLTBL(pg);
+pve = *(pv->vector_elm = vector - cell_id);
+if (pve == UNUSED_VECTOR || pve == RSVDID)
 	{
-		pv->pcell = (short *)pg;
-		f_far = pv->cell_siz = 0;
+	pv->pcell = (short *)pg;
+	f_far = pv->cell_siz = 0;
 	}
-	else
+else
 	{
-		pv->pcell = (short *)(pg + pve);
-		f_far = (pv->data_siz = *pv->pcell) & FARCELL;
-		pv->cell_siz = (short)dbcmptcellsiz(pv->data_siz &= SIZPART);
+	pv->pcell = (short *)(pg + pve);
+	f_far = (pv->data_siz = *pv->pcell) & FARCELL;
+	pv->cell_siz = (short)dbcmptcellsiz(pv->data_siz &= SIZPART);
 	}
-	pv->rh_far_cell = f_far ? *((RHDL *)(pv->pcell + 1)) : 0;
-	if (cell_id <= 0 || cell_id > ((CELLTBL *)pv->celltbl)->vector_siz || (ofst = ((char *)pv->pcell - pg)) < 0 || ofst > PGSIZ)
-		throw SE_BADCELLID;
+pv->rh_far_cell = f_far ? *((RHDL *)(pv->pcell + 1)) : 0;
+if (cell_id <= 0 || cell_id > ((CELLTBL *)pv->celltbl)->vector_siz || (ofst = ((char *)pv->pcell - pg)) < 0 || ofst > PGSIZ)
+	throw SE_BADCELLID;
 }
-// pg pve vector
 
 #define dbpsetvars_r(pv, rhdl) dbpsetvars((pv), bfsrch(RHDLPG(rhdl), YES), RHDLCELL(rhdl))
 #define set_dirty(buff_flag_addr) (*(buff_flag_addr) |= DIRTY_PG)
 
 static void dbpmrkpgdirty(RHDL rh_rec)
 {
-	PGVARS pv;
-	short *flg;
-	dbpsetvars_r(&pv, rh_rec);
-	flg = &pv.buf->bflags;
-	if (pv.rh_far_cell) // if cell was moved to far page
+PGVARS pv;
+short *flg;
+dbpsetvars_r(&pv, rh_rec);
+flg = &pv.buf->bflags;
+if (pv.rh_far_cell) // if cell was moved to far page
 	{
-		short prv = (short)(*flg & LOCKED); // save existing lock Status
-		*flg |= LOCKED;						// lock 'base' record temporarily
-		dbpmrkpgdirty(pv.rh_far_cell);		// mark far cell as dirty
-		SETLOCK(*flg, prv);					// reinstate lock Status of base record
+	short prv = (short)(*flg & LOCKED); // save existing lock Status
+	*flg |= LOCKED;						// lock 'base' record temporarily
+	dbpmrkpgdirty(pv.rh_far_cell);		// mark far cell as dirty
+	SETLOCK(*flg, prv);					// reinstate lock Status of base record
 	}
-	else
-		set_dirty(flg);
+else
+	set_dirty(flg);
 }
 
 static void dbactv(HDL h_db)
 {
-	if ((_h_db = h_db) == 0)
+if ((_h_db = h_db) == 0)
 	{
-		_dbfil = 0;
-		throw SE_NULLHDL;
+	_dbfil = 0;
+	throw SE_NULLHDL;
 	}
-	_dbfil = _H_DB->h_db_fl;
-	//_pgsz=_H_DB->pgsz;
-	_mapmap = &_H_DB->mapmap;
+_dbfil = _H_DB->h_db_fl;
+_mapmap = &_H_DB->mapmap;
 }
 
 static void *_recadr(RHDL rh_rec, short *psiz, short **flg)
 {
-	PGVARS pv;
-	dbpsetvars_r(&pv, rh_rec);
-	if (pv.rh_far_cell)
-		return (_recadr(pv.rh_far_cell, psiz, flg));
-	if (flg)
-		*flg = &pv.buf->bflags;
-	if (psiz)
-		*psiz = pv.data_siz; /* retrieve cell size less stored len*/
-	return (pv.pcell + 1);	 /* move to data after stored len     */
+PGVARS pv;
+dbpsetvars_r(&pv, rh_rec);
+if (pv.rh_far_cell)
+	return (_recadr(pv.rh_far_cell, psiz, flg));
+if (flg)
+	*flg = &pv.buf->bflags;
+if (psiz)
+	*psiz = pv.data_siz; /* retrieve cell size less stored len*/
+return (pv.pcell + 1);	 /* move to data after stored len     */
 }
 
 static void *_recadr0(RHDL rh_rec, short *psiz) { return (_recadr(rh_rec, psiz, 0)); }
@@ -547,91 +539,86 @@ static void *_recadr1(RHDL rh_rec, short **flg) { return (_recadr(rh_rec, 0, flg
 
 static void *_recadr1d(RHDL rh_rec)
 {
-	short *flg;
-	void *ad = _recadr(rh_rec, 0, &flg);
-	set_dirty(flg);
-	return (ad);
+short *flg;
+void *ad = _recadr(rh_rec, 0, &flg);
+set_dirty(flg);
+return (ad);
 }
 
 static void bhdrupd(RHDL rhdl, RHDL root, int32_t key_ct)
 {
-	short *flg;
-	BHDR *b = (BHDR *)_recadr1(rhdl, &flg);
-	if (b->bhrh_root != root || b->bhkey_ct != key_ct)
+short *flg;
+BHDR *b = (BHDR *)_recadr1(rhdl, &flg);
+if (b->bhrh_root != root || b->bhkey_ct != key_ct)
 	{
-		b->bhrh_root = root;
-		b->bhkey_ct = key_ct;
-		set_dirty(flg);
+	b->bhrh_root = root;
+	b->bhkey_ct = key_ct;
+	set_dirty(flg);
 	}
 }
 
 int cp_bytes(const void *a, const void *b)
 {
-	return (memcmp(a, b, _btr_ks0));
+return (memcmp(a, b, _btr_ks0));
 }
 
 int cp_strn_ks0(const void *a, const void *b)
 {
-	return (strncmp((const char *)a, (const char *)b, _btr_ks0));
+return (strncmp((const char *)a, (const char *)b, _btr_ks0));
 }
 
 static void btrbind(HDL h_btr)
 {
-	if ((HDL)_h_btr != h_btr)
+if ((HDL)_h_btr != h_btr)
 	{
-		_h_btr = (BTR *)h_btr;
-		_btr_ksz4 = (short)((_btr_ks0 = _h_btr->keysiz) + 4);
-		_btr_flg = &_h_btr->flg;
-		_btr_kpn = (short)((MAXRECSIZ - (sizeof(BNODE) - sizeof(RHDL))) / _btr_ksz4);
+	_h_btr = (BTR *)h_btr;
+	_btr_ksz4 = (short)((_btr_ks0 = _h_btr->keysiz) + 4);
+	_btr_flg = &_h_btr->flg;
+	_btr_kpn = (short)((MAXRECSIZ - (sizeof(BNODE) - sizeof(RHDL))) / _btr_ksz4);
 	}
-	dbactv(_h_btr->h_db);
+dbactv(_h_btr->h_db);
 }
-
-// short btrkeysiz(HDL h_btr) {return(H_BTR->keysiz);}
 
 // Copy the found key value and rhdl out to (the user's) addresses
 static void btrakeyret(RHDL *rhdl, void *ky)
 {
-	if (ky)
-		memmove(ky, _h_btr->actv_key, _btr_ks0);
-	if (rhdl)
-		*rhdl = *(RHDL *)(_h_btr->actv_key + _btr_ks0);
+if (ky)
+	memmove(ky, _h_btr->actv_key, _btr_ks0);
+if (rhdl)
+	*rhdl = *(RHDL *)(_h_btr->actv_key + _btr_ks0);
 }
 
 short btrkeytyp(HDL h_btr)
 {
-	return (H_BTR->keytyp);
+return (H_BTR->keytyp);
 }
 
 #define FIX_KEYCT 1
 int32_t btrnkeys(HDL h_btr) // *again
 {
 #ifdef FIX_KEYCT
-	if (H_BTR->keyct < 2)
+if (H_BTR->keyct < 2)
 	{
-		int32_t ct;
-		btrbind(h_btr);
-		for (bkysetpos(ct = NO); bkynxtkey(0, 0); ct++)
+   int32_t ct;
+   btrbind(h_btr);
+   for (bkysetpos(ct = NO); bkynxtkey(0, 0); ct++) {;}
+   if (ct != H_BTR->keyct)
 		{
-			;
-		}
-		if (ct != H_BTR->keyct)
-		{
-			H_BTR->keyct = ct;
-			extern int flopen_status;
-			flopen_status = 2;
-			HDL f = flopen("\\SJH_Err.log", "a");
-			if (f)
+      H_BTR->keyct = ct;
+      extern int flopen_status;
+      flopen_status = 2;
+      HDL f = flopen("SJH_Err.log", "a");
+      if (f)
 			{
-				char wrk[256];
-				strfmt(wrk, "KeyCount error in %s", flnam(_dbfil));
-				flputln(wrk, f);
-				flclose(f);
+         char wrk[256];
+         strfmt(wrk, "KeyCount error in %s", flnam(_dbfil));
+         flputln(wrk, f);
+         flclose(f);
 			}
 		}
 	}
 #endif
-	return (H_BTR->keyct);
+return (H_BTR->keyct);
 }
 
 // Macro is slightly faster, but a bit costly on space!
@@ -650,24 +637,23 @@ static void btrupdrt(RHDL new_root)
 }
 
 void btr_set_cmppart(HDL h_btr, PFI_v_v func)
-{
-	H_BTR->cmppart = func;
-}
+{H_BTR->cmppart = func;}
 
 HDL btropen(HDL h_db, RHDL rh_bhdr)
 {
-	BHDR *bhdr;
-	BTR *b;
-	dbactv(h_db);
-	if ((bhdr = (BHDR *)_recadr00(rh_bhdr)) == 0)
-		return (0);
-	b = (BTR *)memgive(sizeof(BTR) + bhdr->keysiz);
-	b->rh_bhdr = rh_bhdr;
-	b->h_db = _h_db;
-	b->keyct = bhdr->bhkey_ct;
-	b->keysiz = bhdr->keysiz; // key0 size
-	b->rh_root = bhdr->bhrh_root;
-	switch (b->keytyp = bhdr->keytyp)
+if (rh_bhdr==0) m_finish("btropen RH=0");
+BHDR *bhdr;
+BTR *b;
+dbactv(h_db);
+if ((bhdr = (BHDR *)_recadr00(rh_bhdr)) == 0)
+	return (0);
+b = (BTR *)memgive(sizeof(BTR) + bhdr->keysiz);
+b->rh_bhdr = rh_bhdr;
+b->h_db = _h_db;
+b->keyct = bhdr->bhkey_ct;
+b->keysiz = bhdr->keysiz; // key0 size
+b->rh_root = bhdr->bhrh_root;
+switch (b->keytyp = bhdr->keytyp)
 	{
 	case DT_BYTES:
 		b->cmppart = cp_bytes;
@@ -682,65 +668,65 @@ HDL btropen(HDL h_db, RHDL rh_bhdr)
 		b->cmppart = cp_ushort;
 		break;
 	case DT_LONG:
-		b->cmppart = cp_int32_t;
+		b->cmppart = cp_long;
 		break;
 	case DT_ULONG:
 		b->cmppart = cp_ulong;
 		break;
 	}
-	dlrlink((DLRING *)_H_DB->btrs, (DLRING *)b);
-	_h_btr = 0; // Make sure it doesn't seem to be 'currently bound'!
-	return (_H_DB->btrs = (HDL)b);
-} // Ins this btr at front of this db's linked list of btr's and return it
+dlrlink((DLRING *)_H_DB->btrs, (DLRING *)b);   // prepend ptr->btr to cur_db's linked list
+_h_btr = 0; // Make sure it doesn't seem to be 'currently bound'!
+return (_H_DB->btrs = (HDL)b);				   // return ptr->btr
+}
 
 void *btrcargo(HDL h_btr, void *cargo)
 {
-	short *flg;
-	BHDR *b;
-	btrbind(h_btr);
-	if ((b = (BHDR *)_recadr1(_h_btr->rh_bhdr, &flg)) == 0)
-		return (0);
-	if (cargo)
+short *flg;
+BHDR *b;
+btrbind(h_btr);
+if ((b = (BHDR *)_recadr1(_h_btr->rh_bhdr, &flg)) == 0)
+	return (0);
+if (cargo)
 	{
-		memmove(b->cargo, cargo, 22);
-		set_dirty(flg);
+	memmove(b->cargo, cargo, 22);
+	set_dirty(flg);
 	}
-	return (b->cargo);
+return (b->cargo);
 }
 
 void btrclose(HDL h_btr)
 {
-	btrbind(h_btr);
-	bhdrupd(_h_btr->rh_bhdr, _h_btr->rh_root, _h_btr->keyct);
-	bffilflush(NO);
-	_H_DB->btrs = (char *)dlrsnap((DLRING *)_H_DB->btrs, (DLRING *)_h_btr);
-	memtake(_h_btr);
-	_h_btr = 0;
+btrbind(h_btr);
+bhdrupd(_h_btr->rh_bhdr, _h_btr->rh_root, _h_btr->keyct);
+bffilflush(NO);
+_H_DB->btrs = (char *)dlrsnap((DLRING *)_H_DB->btrs, (DLRING *)_h_btr);
+memtake(_h_btr);
+_h_btr = 0;
 }
 
 // Flush out any unclosed b-trees for the database being closed
 static void btrallclose(void)
 {
-	HDL h_btr;
-	while ((h_btr = _H_DB->btrs) != 0)
-		btrclose(h_btr);
+HDL h_btr;
+while ((h_btr = _H_DB->btrs) != 0)
+	btrclose(h_btr);
 }
 
 // Return a page number within this pagemap with at least 'siz' bytes free, or NOTFND if no page has enough space
 static int _pgmscnpg(int siz, int nmap)
 {
-	PGMAP *pm = (PGMAP *)_recadr00(_mapmap->pgmaps[nmap].rh_pgmap);
-	for (int i = 0; i <= pm->lst_pg; i++)
-		if ((pm->map_free_sp[i] & SIZPART) >= siz)
-			return (i + FST_PG_IN_MAP(nmap));
-	return (NOTFND);
+PGMAP *pm = (PGMAP *)_recadr00(_mapmap->pgmaps[nmap].rh_pgmap);
+for (int i = 0; i <= pm->lst_pg; i++)
+	if ((pm->map_free_sp[i] & SIZPART) >= siz)
+		return (i + FST_PG_IN_MAP(nmap));
+return (NOTFND);
 }
 
 static void dbpinit(void *pg)
 {
-	CELLTBL *celltbl = DBPCELLTBL(pg);
-	celltbl->free_sp = (PGSIZ - FOOTERSIZ);
-	celltbl->lfc = celltbl->free_off = celltbl->ncells = celltbl->vector_siz = 0;
+CELLTBL *celltbl = DBPCELLTBL(pg);
+celltbl->free_sp = (PGSIZ - FOOTERSIZ);
+celltbl->lfc = celltbl->free_off = celltbl->ncells = celltbl->vector_siz = 0;
 }
 
 static void *dbdummypg(char *pg, short data_siz)
@@ -764,20 +750,20 @@ static void *dbdummypg(char *pg, short data_siz)
 // Initialise a new page map
 static void dbmist(PGMAP *pm)
 {
-	pm->lst_pg = -1;
-	for (int i = DBMPGSPMAP; i--;)
-		pm->map_free_sp[i] = PGSIZ - FOOTERSIZ;
-	pm->rh_nxt_pgmap = 0;
+pm->lst_pg = -1;
+for (int i = DBMPGSPMAP; i--;)
+	pm->map_free_sp[i] = PGSIZ - FOOTERSIZ;
+pm->rh_nxt_pgmap = 0;
 }
 
 static void _dbckpt(void)
 {
-	bffilflush(NO);
-	if (_H_DB->db_flg & F_NEW_PGS)
-	{
-		flckpt(_dbfil);
-		_H_DB->db_flg &= ~F_NEW_PGS;
-	}
+bffilflush(NO);
+if (_H_DB->db_flg & F_NEW_PGS)
+{
+	flckpt(_dbfil);
+	_H_DB->db_flg &= ~F_NEW_PGS;
+}
 }
 
 static PGMAP *_pgmappnewmap(PGMAP *pm)
@@ -840,7 +826,7 @@ static short _pgmapppg(void)
 }
 
 #ifdef tetsonly
-void __stdcall Xecho(const char *fmt, ...);
+void Xecho(const char *fmt, ...);
 static void list_free(void)
 {
 	Xecho("freespace:%d\n", Bugbug);
@@ -865,18 +851,18 @@ static void list_free(void)
 
 static int dbmfndsp(int siz)
 {
-	int pgnum, nmap = _mapmap->nmaps - 1;
-	siz = dbcmptcellsiz(siz) + sizeof(short);	  // add 2 bytes in case have to create a new portion of the cell ptr Vector
-	if ((pgnum = _pgmscnpg(siz, nmap)) == NOTFND) // Not enough space in current map?
-	{
-		while (--nmap >= 0)								// Check any prior page maps that have at least 200K free in total
-			if (_mapmap->pgmaps[nmap].tot_free > _200K) // Does it have a page with space for 'siz' bytes?
-				if ((pgnum = _pgmscnpg(siz, nmap)) != NOTFND)
-					return (pgnum);
-		if ((pgnum = _pgmapppg()) == NOTFND) // No space in current or porior pages, so try to add a new pagemap
-			throw SE_DBOVRFLOW;
-	}
-	return (pgnum);
+int pgnum, nmap = _mapmap->nmaps - 1;
+siz = dbcmptcellsiz(siz) + sizeof(short);	  // add 2 bytes in case have to create a new portion of the cell ptr Vector
+if ((pgnum = _pgmscnpg(siz, nmap)) == NOTFND) // Not enough space in current map?
+{
+	while (--nmap >= 0)								// Check any prior page maps that have at least 200K free in total
+		if (_mapmap->pgmaps[nmap].tot_free > _200K) // Does it have a page with space for 'siz' bytes?
+			if ((pgnum = _pgmscnpg(siz, nmap)) != NOTFND)
+				return (pgnum);
+	if ((pgnum = _pgmapppg()) == NOTFND) // No space in current or porior pages, so try to add a new pagemap
+		throw SE_DBOVRFLOW;
+}
+return (pgnum);
 }
 
 static void dbpcmpct(char *pg, CELLTBL *celltbl)
@@ -933,15 +919,15 @@ static void dbpcmpct(char *pg, CELLTBL *celltbl)
 
 static short *dbpmaksp(char *pg, int cell_siz)
 {
-	CELLTBL *celltbl = DBPCELLTBL(pg);
-	char *pfree;
-	if ((pfree = pg + celltbl->free_off) >= // ptr -> free space in cell
-		(((char *)DBPVECTOR(pg)) - (celltbl->vector_siz * sizeof(short)) - cell_siz))
-	{						   // If free space is fragemented, compact it
-		dbpcmpct(pg, celltbl); // (alters the value of <free_off>)
-		pfree = pg + celltbl->free_off;
-	}
-	return ((short *)pfree);
+CELLTBL *celltbl = DBPCELLTBL(pg);
+char *pfree;
+if ((pfree = pg + celltbl->free_off) >= // ptr -> free space in cell
+	(((char *)DBPVECTOR(pg)) - (celltbl->vector_siz * sizeof(short)) - cell_siz))
+{						   // If free space is fragemented, compact it
+	dbpcmpct(pg, celltbl); // (alters the value of <free_off>)
+	pfree = pg + celltbl->free_off;
+}
+return ((short *)pfree);
 }
 
 static short dbpnewid(char *pg)
@@ -965,11 +951,11 @@ static short dbpnewid(char *pg)
 
 static short _pgmmapnum(short pgnum, short *ppg_in_map)
 {
-	short pm_num;
-	for (pm_num = 0; pgnum >= DBMPGSPMAP; pm_num++)
-		pgnum -= DBMPGSPMAP;
-	*ppg_in_map = pgnum;
-	return (pm_num);
+short pm_num;
+for (pm_num = 0; pgnum >= DBMPGSPMAP; pm_num++)
+	pgnum -= DBMPGSPMAP;
+*ppg_in_map = pgnum;
+return (pm_num);
 }
 
 static void dbmupd(PGVARS *pv)
@@ -1005,17 +991,17 @@ static short *dbpsnarfsp(PGVARS *pv)
 
 static int dbpistcell(BUF *buf, int data_siz)
 {
-	PGVARS pv;
-	pv.data_siz = (short)data_siz;
-	dbpsetvars(&pv, buf, dbpnewid(buf->addr));
-	dbpsnarfsp(&pv);
-	return (pv.cell_id); /* pcell=ptr to where data should go on page */
+PGVARS pv;
+pv.data_siz = (short)data_siz;
+dbpsetvars(&pv, buf, dbpnewid(buf->addr));
+dbpsnarfsp(&pv);
+return (pv.cell_id); /* pcell=ptr to where data should go on page */
 }
 
 static RHDL _recist(int siz)	// Find a page with enough space
 {								// for this record, Load to mem,
-	int pg_num = dbmfndsp(siz); // & return RHDL to the record
-	return (RHDLIST(pg_num, dbpistcell(bfsrch(pg_num, YES), siz)));
+int pg_num = dbmfndsp(siz); // & return RHDL to the record
+return (RHDLIST(pg_num, dbpistcell(bfsrch(pg_num, YES), siz)));
 }
 
 static short dbplockpage(RHDL rh_rec)
@@ -1034,38 +1020,38 @@ static short dbplockpage(RHDL rh_rec)
 
 static void dbpfreepage(RHDL rh_rec, int lck)
 {
-	PGVARS pv;
-	dbpsetvars_r(&pv, rh_rec);
-	if (pv.rh_far_cell)
-		dbpfreepage(pv.rh_far_cell, lck);
-	else
-		SETLOCK(pv.buf->bflags, lck);
+PGVARS pv;
+dbpsetvars_r(&pv, rh_rec);
+if (pv.rh_far_cell)
+	dbpfreepage(pv.rh_far_cell, lck);
+else
+	SETLOCK(pv.buf->bflags, lck);
 }
 
 static RHDL reccpy(RHDL rh) // rh = Original record
 {
-	short siz;
-	void *ad = _recadr0(rh, &siz);
-	memmove(_recadr1d(rh = _recist(siz)), ad, siz); // rh = New Copy record
-	return (rh);
+short siz;
+void *ad = _recadr0(rh, &siz);
+memmove(_recadr1d(rh = _recist(siz)), ad, siz); // rh = New Copy record
+return (rh);
 }
 
 static RHDL _recadd(const void *data, short siz)
 {
-	RHDL rh_rec;
-	if (siz > MAXRECSIZ)
-		siz = MAXRECSIZ;
-	else if (siz < 0)
-		siz = 0;
-	dbpmrkpgdirty(rh_rec = _recist(siz));
-	memmove(_recadr00(rh_rec), data, siz); /* copy new data to buf addr */
-	return (rh_rec);
+RHDL rh_rec;
+if (siz > MAXRECSIZ)
+	siz = MAXRECSIZ;
+else if (siz < 0)
+	siz = 0;
+dbpmrkpgdirty(rh_rec = _recist(siz));
+memmove(_recadr00(rh_rec), data, siz); /* copy new data to buf addr */
+return (rh_rec);
 }
 
 RHDL recadd(HDL h_db, const void *data, short siz)
 {
-	dbactv(h_db);
-	return (_recadd(data, siz));
+dbactv(h_db);
+return (_recadd(data, siz));
 }
 
 static void dbprlssp(PGVARS *pv)
@@ -1102,9 +1088,9 @@ static void _recdel(RHDL rhdl)
 
 static short dbmfreesp(short pgnum)
 {
-	short pg_in_map, pm_num = _pgmmapnum(pgnum, &pg_in_map);
-	PGMAP *pm = (PGMAP *)_recadr00(_mapmap->pgmaps[pm_num].rh_pgmap);
-	return ((short)(pm->map_free_sp[pg_in_map] & SIZPART));
+short pg_in_map, pm_num = _pgmmapnum(pgnum, &pg_in_map);
+PGMAP *pm = (PGMAP *)_recadr00(_mapmap->pgmaps[pm_num].rh_pgmap);
+return ((short)(pm->map_free_sp[pg_in_map] & SIZPART));
 }
 
 static RHDL dbpupdcell(RHDL rh_rec, int upd_siz)
@@ -1146,59 +1132,59 @@ static RHDL dbpupdcell(RHDL rh_rec, int upd_siz)
 	if the handle is not valid, the database functions throw an error that we catch here */
 static int dbisrhdl(HDL h_db, RHDL rh_rec)
 {
-	int er = 0;
-	try
+int er = 0;
+try
 	{
-		dbactv(h_db);
-		_recadr00(rh_rec);
+	dbactv(h_db);
+	_recadr00(rh_rec);
 	}
-	catch (int e)
+catch (int e)
 	{
-		er = e;
+	er = e;
 	}
-	return (!er);
+return (!er);
 }
 
 void recdel(HDL h_db, RHDL rhdl)
 {
-	dbactv(h_db);
-	if (IS_XREC(rhdl))
-		xrecrlsbuckets(rhdl);
+dbactv(h_db);
+if (IS_XREC(rhdl))
+	xrecrlsbuckets(rhdl);
 if (rhdl)							// Added 13/04/23
 	_recdel(rhdl);
 }
 
 static void _recupd(RHDL rhdl, const void *data, int siz)
 {
-	if (rhdl)
+if (rhdl)
 	{
-		if (siz < 0)
-			siz = 0;
-		else if (siz > MAXRECSIZ)
-			siz = MAXRECSIZ;
-		memmove(_recadr1d(dbpupdcell(rhdl, siz)), data, siz);
+	if (siz < 0)
+		siz = 0;
+	else if (siz > MAXRECSIZ)
+		siz = MAXRECSIZ;
+	memmove(_recadr1d(dbpupdcell(rhdl, siz)), data, siz);
 	} // (set dirtyflag - rhdl might have changed from normal to far cell)
 }
 
 void recupd(HDL h_db, RHDL rhdl, const void *data, int siz)
 {
-	dbactv(h_db);
-	_recupd(rhdl, data, siz);
+dbactv(h_db);
+_recupd(rhdl, data, siz);
 }
 
 int recget(HDL h_db, RHDL rhdl, void *data, int maxsiz)	// Returns NUMBYTES read
 {
-	dbactv(h_db);
-	short siz;
-	void *p = _recadr0(rhdl, &siz);
-	if (maxsiz==0) maxsiz=siz;
-	if (siz > maxsiz)
-		siz = (short)maxsiz;
-	if (siz <= 0)
-		siz = 0;
-	else
-		memmove(data, p, siz);
-	return (siz);
+dbactv(h_db);
+short siz;
+void *p = _recadr0(rhdl, &siz);
+if (maxsiz==0) maxsiz=siz;
+if (siz > maxsiz)
+	siz = (short)maxsiz;
+if (siz <= 0)
+	siz = 0;
+else
+	memmove(data, p, siz);
+return (siz);
 }
 
 #ifdef inf_fixed
@@ -1851,6 +1837,7 @@ static short bkyprvkey(RHDL *rhdl, void *key)
 // 15/10/03 - support again=NULLPTR to step forward from current position
 // If called with again=NULLPTR immediately after after bkysrch(), returns the sought key (or 0 if search failed)
 // (following calls with again=NULLPTR simply step forward within the btree)
+// DOESN'T WORK AS EXPECTED if bkyupd() is called for any/all keys retrieved - use BK_GT to step thru
 int bkyscn_all(HDL btr, RHDL *rhdl, void *key, int *again)
 {
 	btrbind(btr);
@@ -1913,36 +1900,34 @@ RHDL btrist(HDL h_db, int key_typ, int key_siz)
 }
 
 // Delete all keys in btree, and if del_rhdl==YES, delete all rhdl's as well
-void bkydel_all(HDL btr, int del_rhdl)
+void bkydel_all(HDL btr, bool del_rhdl)
 {
-	int again = false;
-	RHDL rh;
-	while (bkyscn_all(btr, del_rhdl ? &rh : 0, 0, &again))
-		if (bkydel(btr, 0, _h_btr->actv_key))
-			if (del_rhdl && dbisrhdl(_h_db, rh))
-				recdel(_h_db, rh);
+int again = false;
+RHDL rh;
+while (bkyscn_all(btr, del_rhdl ? &rh : 0, 0, &again))
+   if (bkydel(btr, 0, _h_btr->actv_key))
+      if (del_rhdl && dbisrhdl(_h_db, rh))
+         recdel(_h_db, rh);
 }
 
 void btrrls(HDL h_btr)
 {
-	bkydel_all(h_btr, NO); // (this calls btrbind)
-	RHDL rh_bhdr = _h_btr->rh_bhdr;
-	RHDL rh_root = _h_btr->rh_root;
-	btrclose(h_btr);
-	_recdel(rh_bhdr);
-	_recdel(rh_root);
+bkydel_all(h_btr, false); // (this calls btrbind)
+RHDL rh_bhdr = _h_btr->rh_bhdr;
+RHDL rh_root = _h_btr->rh_root;
+btrclose(h_btr);
+_recdel(rh_bhdr);
+_recdel(rh_root);
 }
 
 unsigned short dbpgct(HDL _h_db)
-{
-	return (_H_DB->mapmap.pgs_in_db);
-}
+{return (_H_DB->mapmap.pgs_in_db);}
 
 char *dbfnam(HDL db)
 {
-	if (!db)
-		db = _h_db;
-	return (((DB *)db)->db_fnam);
+if (!db)
+   db = _h_db;
+return (((DB *)db)->db_fnam);
 }
 
 /*  you can set Buffer swapping off for batch processing.
@@ -1953,47 +1938,44 @@ char *dbfnam(HDL db)
 
 void dbckpt(HDL h_db)
 {
-	dbactv(h_db);
-	_dbckpt();
-	flsafe(_dbfil); // added 12/01/04 ############### shouldn't be needed if VB always calls dllshutdown
+dbactv(h_db);
+_dbckpt();
+flsafe(_dbfil); // added 12/01/04 ############### shouldn't be needed if VB always calls dllshutdown
 }
 
 // Read in the 'MAPMAP' map of pagemaps for current database
 static void dbmrd(void)
 {
-	int n;
-	PGMAP *pm;
-	_mapmap = &_H_DB->mapmap;
-	_mapmap->nmaps = 1;			  // 29/4/03 I think this 'pre-initialisation' is redundant
-	_mapmap->pgs_in_db = MAXPGCT; // 29/4/03 I think this 'pre-initialisation' is redundant
-	PGMAPS *pms = _mapmap->pgmaps;
-	pms->rh_pgmap = RHDLIST(1, 1); // 1st page map is always in page 1, cell 1
-	for (n = MAXPGMAPS; n--;)	   // 29/4/03 I think this 'pre-initialisation' is redundant
-		pms[n].tot_free = ((int32_t)(DBMPGSPMAP)) * MAXRECSIZ;
-	for (RHDL rhm = _mapmap->pgmaps[_mapmap->nmaps = 0].rh_pgmap; rhm; rhm = pm->rh_nxt_pgmap) // for each map...
+int n;
+PGMAP *pm;
+_mapmap = &_H_DB->mapmap;
+_mapmap->nmaps = 1;			  // 29/4/03 I think this 'pre-initialisation' is redundant
+_mapmap->pgs_in_db = MAXPGCT; // 29/4/03 I think this 'pre-initialisation' is redundant
+PGMAPS *pms = _mapmap->pgmaps;
+pms->rh_pgmap = RHDLIST(1, 1); // 1st page map is always in page 1, cell 1
+for (n = MAXPGMAPS; n--;)	   // 29/4/03 I think this 'pre-initialisation' is redundant
+   pms[n].tot_free = ((int32_t)(DBMPGSPMAP)) * MAXRECSIZ;
+for (RHDL rhm = _mapmap->pgmaps[_mapmap->nmaps = 0].rh_pgmap; rhm; rhm = pm->rh_nxt_pgmap) // for each map...
 	{
-		pms = &_mapmap->pgmaps[_mapmap->nmaps];
-		pm = (PGMAP *)_recadr00(rhm);
-		n = pm->lst_pg + 1; // number of pages in this map
-		//if (n<1) break; //, sjh this needs looking at!
-		if (_mapmap->nmaps++) //
+   pms = &_mapmap->pgmaps[_mapmap->nmaps];
+   pm = (PGMAP *)_recadr00(rhm);
+   n = pm->lst_pg + 1; // number of pages in this map
+   //if (n<1) break; //, sjh this needs looking at!
+   if (_mapmap->nmaps++) //
 		{
-//#pragma warning(push, 3)
-			_mapmap->pgs_in_db += n;
-//#pragma warning(pop)
-			pms->rh_pgmap = rhm;
+      _mapmap->pgs_in_db += n;
+      pms->rh_pgmap = rhm;
 		}
-		else
-			_mapmap->pgs_in_db = (short)n;
-		while (n--)
-			pms->tot_free += ((pm->map_free_sp[n] & SIZPART) - MAXRECSIZ);
+	else
+		_mapmap->pgs_in_db = (short)n;
+	while (n--)
+		pms->tot_free += ((pm->map_free_sp[n] & SIZPART) - MAXRECSIZ);
 	}
 }
 
 
 static bool dbstart(int nbufs)
 {
-//nbufs=12;
 if (_bf_ct) return(NO);		// Nothing to do if db system already started
 _dbt = 0;
 bfspist(nbufs);
@@ -2014,29 +1996,28 @@ return(YES);
 // deep doo-doo's, but we'll keep a 'back-door' Alt/Fn9 in dbcorrupt().
 static HDL dbopen(const char *dbase)
 {
-	char fullpath[FNAMSIZ], mode[4] = {'r', '+', 0, 0};
-	if (_lock)
-		mode[0] = 'R';
-	mode[2] = (char)dbsafe_catch;
-	_h_db = 0;
-//	if (!_bf_addr) throw SE_NOTACTIVE;  // Oct21 - caller didn't invoke Dbstart for buffers!
-	if (!_bf_addr) dbstart(32);  // Mar'23
-	drfullpath(fullpath, dbase);
-	_dbfil = flopen(fullpath, mode);
-	if (_dbfil)
+char fullpath[FNAMSIZ], mode[4] = {'r', '+', 0, 0};
+if (_lock)
+   mode[0] = 'R';
+mode[2] = (char)dbsafe_catch;
+_h_db = 0;
+if (!_bf_addr) dbstart(32);  // Mar'23
+drfullpath(fullpath, dbase);
+_dbfil = flopen(fullpath, mode);
+if (_dbfil)
 	{
-		_h_db = (char *)memgive(sizeof(DB) + strlen(fullpath) +1);
-		_H_DB->h_db_fl = _dbfil;
+   _h_db = (char *)memgive(sizeof(DB) + strlen(fullpath) +1);
+   _H_DB->h_db_fl = _dbfil;
 
-		if (_lock)
-			_H_DB->db_flg |= F_RDONLY;
-		strcpy(_H_DB->db_fnam, fullpath);
-		_dbt = (char *)dlrlink((DLRING *)_dbt, (DLRING *)_h_db);
-		dbmrd();
-		char safe;
-		if (!(dbsafe_catch & 128) && (flgetat(&safe, 1, DB_DIRTYPOS, _dbfil) != 1 || safe != DB_IS_CLEAN))
+   if (_lock)
+      _H_DB->db_flg |= F_RDONLY;
+   strcpy(_H_DB->db_fnam, fullpath);
+   _dbt = (char *)dlrlink((DLRING *)_dbt, (DLRING *)_h_db);
+   dbmrd();
+   char safe;
+   if (!(dbsafe_catch & 128) && (flgetat(&safe, 1, DB_DIRTYPOS, _dbfil) != 1 || safe != DB_IS_CLEAN))
 		{
-			SetErrorText("Database %s is corrupt!", fullpath);
+			SJHLOG("Database %s is corrupt!", fullpath);
 			/*if (1)
 {
 Pf_FIL *fil=(Pf_FIL*)_dbfil;
@@ -2050,7 +2031,7 @@ fil->flag|=FIL_DIRTY;
 				//	(fil->flag|=FIL_DIRTY;		// - even if program didn't set DbSafe_Catch on.
 		}
 	}
-	return (_h_db);
+return(_h_db);
 }
 
 
@@ -2058,7 +2039,6 @@ HDL dbopen2(const char *fn)
 {
 int no_write=access(fn,W_OK);
 int prvlock=dbsetlock(no_write?YES:NOTFND);
-//sjhlog("NO_write=%d for %s",no_write,fn);
 HDL db=dbopen(fn);
 if (db==NULLHDL)
     m_finish("Error opening %s",fn);
@@ -2082,17 +2062,17 @@ static void dbstop(void);	// seem to have to pre-declare after AUTO start/stop d
 // DbSafe_Catch in the first place (because FIL_DIRTY won't be set).
 static void dbclose(HDL db)
 {
-	dbactv(db);
-	btrallclose();
-	bffilflush(YES);
-	if (dbsafe > 0)
-		flsafe(_dbfil);
-	flclose(_dbfil);
-	_dbt = (char *)dlrsnap((DLRING *)_dbt, (DLRING *)db);
-	if (((DB *)db)->db_flg & F_TEMP)
-		drunlink(((DB *)db)->db_fnam);
-	memtake(db);
-	_dbfil = 0;
+dbactv(db);
+btrallclose();
+bffilflush(YES);
+if (dbsafe > 0)
+   flsafe(_dbfil);
+flclose(_dbfil);
+_dbt = (char *)dlrsnap((DLRING *)_dbt, (DLRING *)db);
+if (((DB *)db)->db_flg & F_TEMP)
+   drunlink(((DB *)db)->db_fnam);
+memtake(db);
+_dbfil = 0;
 if (_dbt==0) dbstop();
 }
 
@@ -2108,16 +2088,16 @@ dbsafe_catch = 0;
 
 void dbsafeclose(HDL db)
 {
-	dbsafe++;
-	dbclose(db);
-	dbsafe--;
+dbsafe++;
+dbclose(db);
+dbsafe--;
 }
 
 int dbreadonly(HDL db)
 {
-	if (((DB *)db)->db_flg & F_RDONLY)
-		return (YES);
-	return (NO);
+if (((DB *)db)->db_flg & F_RDONLY)
+   return (YES);
+return (NO);
 }
 
 static void dbzap(HDL db, char *name)
@@ -2133,63 +2113,62 @@ void db_set_temp(HDL db)
 /*  put rh_rec of header in to file header, where we can always find it */
 RHDL dbsetanchor(HDL h_db, RHDL rh_anchor)
 {
-	RHDL rh_rec = RHDLIST(0, 1); // Anchor record is always page 0, cell 1
-	dbactv(h_db);
-	DBFHDR *h = (DBFHDR *)_recadr1d(rh_rec);
-	RHDL old_anchor = h->rh_anchor;
-	h->rh_anchor = rh_anchor;
-	return (old_anchor);
+RHDL rh_rec = RHDLIST(0, 1); // Anchor record is always page 0, cell 1
+dbactv(h_db);
+DBFHDR *h = (DBFHDR *)_recadr1d(rh_rec);
+RHDL old_anchor = h->rh_anchor;
+h->rh_anchor = rh_anchor;
+return (old_anchor);
 }
 
 RHDL dbgetanchor(HDL h_db) /* Read page 0/record 1 record */
 {						   /* return database anchor RHDL */
-	dbactv(h_db);
-	return (((DBFHDR *)_recadr00(RHDLIST(0, 1)))->rh_anchor);
+dbactv(h_db);
+return (((DBFHDR *)_recadr00(RHDLIST(0, 1)))->rh_anchor);
 }
 
 // Initialise a database by writing the first 2 pages directly to file without page management
 static void dbinitfil(void)
 {
-	char *pg = (char *)memgive(PGSIZ);
-	PGMAP *pm;
-	DBFHDR *h = (DBFHDR *)dbdummypg(pg, sizeof(DBFHDR));
-	memset(h, 0, sizeof(DBFHDR));
-	h->versn = 1; // DB format version number
-	short fhdr_free = DBPCELLTBL(pg)->free_sp;
-	flput(pg, PGSIZ, _dbfil);
-	dbmist(pm = (PGMAP *)dbdummypg(pg, MAXRECSIZ));
-	pm->map_free_sp[0] = fhdr_free;
-	pm->map_free_sp[1] = 0;
-	pm->lst_pg = 1;
-	flput(pg, PGSIZ, _dbfil);
-	memtake(pg);
+char *pg = (char *)memgive(PGSIZ);
+PGMAP *pm;
+DBFHDR *h = (DBFHDR *)dbdummypg(pg, sizeof(DBFHDR));
+memset(h, 0, sizeof(DBFHDR));
+h->versn = 1; // DB format version number
+short fhdr_free = DBPCELLTBL(pg)->free_sp;
+flput(pg, PGSIZ, _dbfil);
+dbmist(pm = (PGMAP *)dbdummypg(pg, MAXRECSIZ));
+pm->map_free_sp[0] = fhdr_free;
+pm->map_free_sp[1] = 0;
+pm->lst_pg = 1;
+flput(pg, PGSIZ, _dbfil);
+memtake(pg);
 }
 
 int dbist(const char *dbfnam)
 {
 if (!_bf_addr) dbstart(32);  // Mar10, 2023
-
-	if (_bf_addr && (_dbfil = flopen(dbfnam, "w+")) != 0)
+if (_bf_addr && (_dbfil = flopen(dbfnam, "w+")) != 0)
 	{
-		char xc[] = "(c) SOFTWORKS 2000";
-		dbsafe_catch |= 128; // Inhibit DbSafe trapping temporarily
-		dbinitfil();
-		flclose(_dbfil);
-		dbopen(dbfnam);			 // open database (dbactv(), set _dbfil, etc...)
-		_recadd(xc, sizeof(xc)); // was 'recadd(h_db,...)'
-		dbclose(_h_db);
-		dbsafe_catch &= 127; // Re-instate original value (0 or DB_IS_DIRTY)
-		return (YES);
+   char xc[] = "(c) SOFTWORKS 2000";
+   dbsafe_catch |= 128; // Inhibit DbSafe trapping temporarily
+   dbinitfil();
+   flclose(_dbfil);
+   dbopen(dbfnam);			 // open database (dbactv(), set _dbfil, etc...)
+   _recadd(xc, sizeof(xc)); // was 'recadd(h_db,...)'
+   dbclose(_h_db);
+   dbsafe_catch &= 127; // Re-instate original value (0 or DB_IS_DIRTY)
+   return (YES);
 	}
-	return (NO);
+return (NO);
 }
 
 int dbsetlock(int on)
 {
-	int prv = _lock;
-	if (on != NOTFND)
-		_lock = on;
-	return (prv);
+int prv = _lock;
+if (on != NOTFND)
+   _lock = on;
+return (prv);
 }
 
 #pragma pack(push, 1)
@@ -2222,7 +2201,6 @@ struct XRFCB
 };
 #pragma pack(pop)
 
-//static void rdbkt(RHDL rh_xrec, short bkt, RHDL *p_rhdl, short *psiz)
 static void rdbkt(RHDL rh_xrec, short bkt, uint32_t *p_rhdl, short *psiz)
 {
 	XREC *x = (XREC *)_recadr00(rh_xrec);
@@ -2500,7 +2478,7 @@ return(nrh);
 DBERROR::DBERROR(int *_err)
 {
 	err = _err;
-	SetErrorText("");
+	SJHLOG("");
 }
 
 // Unless the db subsystem already set some useful error text,

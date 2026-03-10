@@ -2,55 +2,10 @@
 #define IMDB_H
 
 #include "db.h"
+#include "memgive.h"
 #include "qblob.h"
 
-#define FID_IMDB_NUM 'I'
-#define FID_GENRE 'G'
-#define FID_RUNTIME 'R'
-#define FID_CAST 'C'
-#define FID_DIRECTOR 'D'
-#define FID_TITLE 'T'
-#define FID_YEAR 'Y'
-
-#define NUMCOLS 17
-
-#define COL_RECENT 0
-#define COL_TITLE 1 
-#define COL_YEAR 2
-#define COL_RATING 3 
-#define COL_TMDB 4 
-#define COL_IMDB 5 
-#define COL_DIRECTOR 6 
-#define COL_ADDED 7 
-#define COL_SEEN 8 
-#define COL_GB 9 
-#define COL_CAST 10 
-#define COL_RUNTIME 11 
-#define COL_NOTES 12 
-#define COL_NOTES1 13 
-#define COL_RATING1 14 
-#define COL_GENRE 15
-#define COL_MYSEEN 16
- 
-struct FLDX
-{
-	const char	*fnm,		// fixed internal 'system' name of field
-					*name;	// user-displayed column heading of field
-	int align;				// left - centre - right
-	char fid;				// fixed internal systemm ID of field
-};
-extern FLDX fld[NUMCOLS];
-
-struct FCTL
-{
-	char	id;
-	void	*ph,			// (always present) Array of actual values, OR some kind of indirection into 'pa' 
-			*pa;			// (only if used for any given 'id' fieldtype) Some kind of table of "all values" for id
-};
-
-extern char idx_fid[];
-
-class IMDB_API : public DBX
+class IMDB_API : public DBX		// accesses "imdb.api" database of results from api calls
 {
 public:
 	IMDB_API(const char *fn=NULL); // Constructor used by app progs

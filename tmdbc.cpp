@@ -15,7 +15,6 @@
 #include "log.h"
 #include "memgive.h"
 #include "str.h"
-#include "smdb.h"
 #include "parm.h"
 #include "exec.h"
 #include "imdb.h"
@@ -42,7 +41,7 @@ source.toUTF8String(result);
 bool amd=(strcmp(str,result.c_str())!=0);
 if (amd) strcpy(str,result.c_str());
 delete transliterator;
-return(amd);
+return(amd);			// did we make ANY changes to the passed string?
 }
 
 
@@ -167,17 +166,27 @@ copy2jb(jb,&jb2,"imdbVotes");
 add_missing_tmdb_from_omdb(jb,&jb2,"Director");       // POPULATE MISSING TMDB VALUES FROM OMDB VALUES for these fields
 add_missing_tmdb_from_omdb(jb,&jb2,"Actors");
 add_missing_tmdb_from_omdb(jb,&jb2,"Genre");
+
+char wrk[128];
+if (1)
+   {
+   my_json_get(wrk,buf8k,sizeof(wrk),"Year",0);
+   if (valid_movie_year(a2i(wrk,wrk[4]=0)))
+      jb->put("Year",wrk);
+   }
+
+
 }
 
 // FLDX fld defines the field names expected in 'blob' regardless of what omdb or tmdb called them
-static void add2tbuf(JBLOB_READER *jb, OMZ *k)
+static void add2tbuf(JBLOB_READER *jb, OMZ *oz)
 {
 char cmd[512], buf8k[8192];
-strfmt(cmd,"curl -s 'https://api.themoviedb.org/3/%s/%d?api_key=%s", mtyp[k->k.tv], k->k.tmno, tapikey());
+strfmt(cmd,"curl -s 'https://api.themoviedb.org/3/%s/%d?api_key=%s", mtyp[oz->k.tv], oz->k.tmno, tapikey());
 strcat(cmd,"&append_to_response=credits,release_dates'");
 strcat(cmd," | jq '. | {");
 
-if (k->k.tv)
+if (oz->k.tv)
 	strcat(cmd,"title: .name, release_year: .air_date, runtime: (.episode_run_time | if . then .[0] else null end)");
 else
 	strcat(cmd,"title: .title, release_year: .release_date, runtime: .runtime");
@@ -188,8 +197,17 @@ strcat(cmd,", genres: [.genres[] | .name], overview: .overview");
 strcat(cmd,"}'");
 int err=exec_cmd(cmd, buf8k, sizeof(buf8k));
 if (err) {sjhlog("tmdbc.cpp:add2tbuf() cmd:\n%s\nFailed!");}
-json2blob(jb,"Title",buf8k,"title");
-json2blob(jb,"Year",buf8k,"release_year");
+json2blob(jb,"Title",buf8k,"title");	// (includes transliterator call to reduce UTF8 to Ascii)
+
+if (oz->year==0)   // this IF leg created 08/12/25 for The Thinking Game (2024) (don't want 2025 from tmdb)
+   {
+   const char *pyear=jb->get("Year");
+   int year;
+   if ((year=a2i(pyear,4))!=0 && !a2err && valid_movie_year(year))
+      oz->year=year;
+   }
+if (oz->year==0)
+   json2blob(jb,"Year",buf8k,"release_year");
 json2blob(jb,"Runtime",buf8k,"runtime");
 json2blob(jb,"Director",buf8k,"director");
 json2blob(jb,"Actors",buf8k,"actors");
@@ -241,8 +259,10 @@ char cmd[256];       /// todo  -sS should be ok here rather than STD_ERRNULL
 strfmt(cmd,"curl 'https://api.themoviedb.org/3/find/tt%07d?api_key=%s", imno, tapikey());
 strendfmt(cmd,"%s %s","&external_source=imdb_id'", STD_ERRNULL);
 int err=exec_cmd(cmd, buf8k, 8192);
-return(err==0);
+//if (err!=0) sjhlog("No TMDB entry for IMDB Number tt%07d",imno);
+return(err==0);      // ret=TRUE if no error
 }
+
 
 bool tmdb_all_from_number(OMZ *oz, char *buf8k)
 {

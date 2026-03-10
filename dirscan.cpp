@@ -35,13 +35,6 @@ if (mask) Scrap(mask);
 Scrap(_pth);
 }
 
-// Return offset of LAST occurrence of char in string
-static int stridxcr(char c,const char *s)
-{
-const char *p=strrchr(s,c);
-return(p?p-s:NOTFND);
-}
-
 static int mask_okay(char *m, char *f) // pointers to wantedmask and filename
 {
 while (m[0] && m[0]!='*')
@@ -55,36 +48,41 @@ return(YES);    // If we got here the filename must match the mask
 
 struct dirent* DIRSCAN::next(FILEINFO *fi)
 {
+struct stat st;
+char fullpath[PATH_MAX];
 while ((entry = readdir(dir)) != NULL)
 	{
-    char n[FNAMSIZ];
-    strcpy(n,entry->d_name);                                // This is just bare filename (not "pathed")
-    if (SAME2BYTES(n,".") || SAME3BYTES(n,"..")) continue;  // ignore 1 or 2 dots followed by EOS nullbyte
-    if (mask)
-        {
-        char *ext=NULL;
-        int dot=stridxcr('.',n);
-        if (dot!=NOTFND) {n[dot]=0; ext=&n[dot+1];}
-        if (!mask_okay(mask,n)) continue;
-        if (maskext!=NULL && ext!=NULL) if (!mask_okay(maskext,ext)) continue;
-        }
-    break;  // If we got here, break out of loop and return non-null "entry" ptr
-    }
-if (entry!=0 && fi!=0)  // Then copy FULL path to fi->name, along with correct filesize from stat()
-    {
-    struct stat sb;
-    stat(strfmt(fi->name,"%s/%s",_pth,entry->d_name),&sb);
-    fi->attr=entry->d_type;
-    fi->size=sb.st_size;
-    fi->dttm=sb.st_mtime;
-    }
+   strfmt(fullpath, "%s/%s", _pth, entry->d_name);          // prepend the full path to pass to lstat()
+   if (lstat(fullpath, &st)!=0) continue;
+   if (S_ISDIR(st.st_mode))
+      {if (SAME2BYTES(entry->d_name,".") || SAME3BYTES(entry->d_name,"..")) continue;}
+   else if (!S_ISREG(st.st_mode)) continue;
+   char n[FNAMSIZ];
+   strcpy(n,entry->d_name);                                 // This is just bare filename (not "pathed")
+   if (mask)
+      {
+      char *ext=NULL;
+      int dot=strridxc('.',n);                        // offset of LAST occurrence of '.' in string
+      if (dot!=NOTFND) {n[dot]=0; ext=&n[dot+1];}
+      if (!mask_okay(mask,n)) continue;
+      if (maskext!=NULL && ext!=NULL) if (!mask_okay(maskext,ext)) continue;
+      }
+   break;  // If we get here, break out of loop so we can return this (non-null) "entry" ptr
+   }
+if (entry!=NULL && fi!=NULL)  // Then copy FULL path to fi->name, along with correct size/dttm from lstat()
+   {
+   strcpy(fi->name,fullpath);
+   fi->attr=entry->d_type;
+   fi->size=st.st_size;
+   fi->dttm=st.st_mtime;
+   }
 return(entry);
 }
 
 
 // Sort DIRTBL elements by filename. If renaming would have 'lost' duplicate OUTPUT filenames,
 // they can be be preserved by appending cd2, cd3,...
-int _cdecl cp_fi(const void *a, const void *b)
+int cp_fi(const void *a, const void *b)
 {
 /*char af[256], bf[256];
 cp_fix(a,af);

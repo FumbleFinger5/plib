@@ -1,8 +1,8 @@
-#include "smdb.h"
+//#include "smdb.h"
 
 struct NAMCT {char nam[30]; short ct;};
 // sort actors in ASCENDING order of "popularity" (No. of times they appear in my movies)
-int _cdecl cp_namct(NAMCT *a, NAMCT *b);
+int cp_namct(NAMCT *a, NAMCT *b);
 
 // Sorts up to 5 comma-separated "Firstname(s) + Surname" sub-elements in each item
 int cp_name(char *a, char *b);

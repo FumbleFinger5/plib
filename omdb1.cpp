@@ -3,11 +3,9 @@
 #include <stdio.h>
 #include <utime.h>
 #include <stdlib.h>
-
 #include <time.h>
 #include <string.h>
 #include <cstdarg>
-
 #include "pdef.h"
 #include "db.h"
 #include "cal.h"
@@ -16,33 +14,12 @@
 #include "log.h"
 #include "memgive.h"
 #include "str.h"
-#include "smdb.h"
 #include "omdb1.h"
 #include "dirscan.h"
 #include "parm.h"
 #include "qblob.h"
 #include "imdb.h"
 #include "imdbf.h"
-
-
-
-char *fix_colon(char *nam)	// Change any ":" in MovieName to " -" and delete any '?'
-{
-char *p;
-//while ((p=strchr(nam,':'))!=NULL) strins(strdel(p,1)," -");
-//while ((p=strchr(nam,'?'))!=NULL) strdel(p,1);
-while ((p=strchr(nam,':'))!=NULL) *p=SPACE;
-while ((p=strchr(nam,'?'))!=NULL) *p=SPACE;
-return(nam);		// Return passed string address as a convenience
-}
-
-int32_t tt_number_from_str(const char *s)
-{
-if (*s=='_') s++;
-if (SAME2BYTES(s,"tt")) s+=2;
-return(a2l(s,0));
-}
-
 
 int user_not_steve, running_live;
 
@@ -81,7 +58,7 @@ sjhlog("db1 format updated to v3");
     }
 }
 
-OMDB1::OMDB1(bool _master)		// If 'master', open OmDb.db2, not *.db1
+OMDB1::OMDB1(bool _master, bool create)		// If 'master', open OmDb.db2, not *.db1
 {
 char fn[256];
     {
@@ -91,27 +68,28 @@ char fn[256];
     else
         get_conf_path(fn,"smdb.usr");
     }
+bool created=false;
 if (access(fn, F_OK ))		// mode=F_OK=0, where non-zero return value means file doesn't exist AT ALL
-	{						// mode could be either or both (R_OK|W_OK) for "User has Read / Write access"
-	Xecho("Creating database %s\r\n",fn);
-	if (!dbist(fn) || (db=dbopen2(fn))==NULLHDL) goto err;
-	memset(&hdr,0,sizeof(hdr));
-	hdr.ver=3;
-	hdr.om_rhdl=btrist(db,DT_ULONG,sizeof(int32_t));
-	dbsetanchor(db,recadd(db,&hdr,sizeof(hdr)));
-	dbsafeclose(db);
+   {						// mode could be either or both (R_OK|W_OK) for "User has Read / Write access"
+//   char wrk[256];
+   if (!create) m_finish("Error opening %s",fn);
+	SJHLOG("Creating database %s",fn);
+	if (dbist(fn) && (db=dbopen2(fn))!=NULLHDL)
+      {
+      memset(&hdr,0,sizeof(hdr));
+      hdr.ver=3;
+      hdr.om_rhdl=btrist(db,DT_ULONG,sizeof(int32_t));
+      dbsetanchor(db,recadd(db,&hdr,sizeof(hdr)));
+      dbsafeclose(db);
+      created=true;
+      }
 	}
+if (create && !created) m_finish("Invalid/failed 'create' switch -c");
 db_open(fn);
-if (btrnkeys(om_btr)==0) restore();
+if (btrnkeys(om_btr)==0) restore();     // If database is empty (was deleted, and new empty one just created)
 return;
-err:
-m_finish("Error creating %s",fn);
 }
 
-OMDB1::~OMDB1()
-{
-dbsafeclose(db);
-}
 void OMDB1::put(OM1_KEY *k)
 {
 RHDL rh;
@@ -142,11 +120,10 @@ else if (zrecget(db,k.mytitle,prv,sizeof(prv))>64)
     m_finish("bad user title size");
 if (title!=NULLPTR && !strcmp(prv,title))    // do nothing if custom title already matches wanted title
     return(true);
-bool kyupd=false;       // dont think i need this one!
 if (title==NULLPTR)                          // if no new custom title specified, delete any existing one 
     {recdel(db,k.mytitle); k.mytitle=0;}
 else
-    k.mytitle=zrecadd_or_upd(db, k.mytitle, (void*)title, strlen(title)+1, &kyupd);
+    k.mytitle=zrecadd_or_upd(db, k.mytitle, (void*)title, strlen(title)+1, NULL);
 return(upd(&k));
 }
 
@@ -183,7 +160,7 @@ OM1_KEY om1;
 om1.imno=imno;
 if (!bkysrch(om_btr,BK_EQ,&rh,&om1.imno)) {Sjhlog("Can't delete imno:%d from %s",imno,filename()); return(NO);}
 if (zrecget(db,rh,&om1,sizeof(OM1_KEY))!=sizeof(OM1_KEY)) throw(88);
-recdel(db,om1.mytitle); // does nothing if no custom title (i.e. mytitle rhdl is NULL)
+recdel(db,om1.mytitle); // does nothing if no custom title (i.e. Mytitle rhdl is NULL)
 recdel(db,om1.notes);
 recdel(db,rh);
 bkydel(om_btr,&rh,&om1.imno);
@@ -191,7 +168,7 @@ Sjhlog("Deleted imno:%d from %s",imno,filename());
 return(YES);
 }
 
-int OMDB1::get_rating(int32_t imno)
+uchar OMDB1::get_rating(int32_t imno)
 {
 OM1_KEY om1;
 if (get_om1(imno,&om1)) return(om1.rating);
@@ -205,10 +182,10 @@ memset(&omk,0,sizeof(OM1_KEY));
 RHDL rh=0;    // have to search AGAIN to get the RH value TODO - add option for Get_om1() to do that
 if (get_om1(omk.imno=imno,&omk))
     bkysrch(om_btr,BK_EQ,&rh,&imno);    // CAN'T fail, 'cos it just worked on precediing line!
-if (omzk==NULLPTR) omk.seen=calnow();   // if just adding/amending record for user_not_steve database 
+if (omzk==NULLPTR) omk.seen=calnow();   // if just adding/amending record for User_not_steve database 
 else
     {
-    if (rh==0) m_finish("put_rating get_om1 FAILED for %d",imno);
+    if (rh==0) m_finish("Put_rating Get_om1 FAILED for %d",imno);
     if (omzk->sz>omk.sz) omk.sz=omzk->sz;     // This is a more recent (larger) copy of the movie
     int32_t now=calnow();
     if (short_bd(omk.seen)<short_bd(now)-30) omk.seen=now;        // not "re-watched" unless more than a month ago
@@ -218,18 +195,20 @@ if (rh!=0) recupd(db,rh,&omk,sizeof(OM1_KEY));
 else  bkyadd(om_btr,recadd(db,&omk,sizeof(OM1_KEY)),&omk);
 }
 
-//char* OMDB1::get_notes(int32_t imno)   // returns an ALLOCATED string
-std::string OMDB1::get_notes(int32_t imno)   // returns an ALLOCATED string
+std::string OMDB1::get_notes(int32_t imno)   // returns an ALLOCATED string managed by stdlib, not memtake
 {
 OM1_KEY om1;
-if (!get_om1(imno,&om1) || om1.notes==NULLRHDL) return((char*)memgive(1));
-int sz;
-char *txt=(char*)zrecmem(db,om1.notes,&sz);
-if (sz==0 || txt[sz-1]!=0) throw(81);   // Notes record must be non-zero length, terminated by nullbyte
+char *txt;
+if (!get_om1(imno,&om1) || om1.notes==NULLRHDL) txt=(char*)memgive(1);
+else
+    {
+    int sz;
+    txt=(char*)zrecmem(db,om1.notes,&sz);
+    if (sz==0 || txt[sz-1]!=0) throw(81);   // Notes record must be non-zero length, terminated by nullbyte
+    }
 std::string sstr(txt);
 memtake(txt);
 return(sstr);
-//return(txt);
 }
 
 void OMDB1::put_notes(int32_t imno, const char *txt)
@@ -262,37 +241,6 @@ else
 recupd(db,rh,&om1,sizeof(OM1_KEY));
 }
 
-
-void OMDB1::list_missing(void)  // List all movies 
-{
-Xecho("List missing movies...\r\n");
-RHDL rh;
-int ct=0, again=0;
-OM1_KEY om1;
-SMDB s;
-short *loct=(short*)memgive(100*sizeof(short));
-IMDB_API ia;
-int rct=btrnkeys(om_btr);
-short today=short_bd(calnow());
-while (bkyscn_all(om_btr,&rh,&om1,&again))
-    {
-    if (recget(db,rh,&om1,sizeof(OM1_KEY))!=sizeof(OM1_KEY)) throw(88);
-    DYNTBL *dt=s.get(om1.imno);
-   if (dt->ct>0) {EMK *ek=(EMK*)dt->get(0); for (int i=0;i<dt->ct;i++) loct[ek[i].locn]++;}
-if (om1.imno==0) {sjhlog("smdb no imno!"); continue;}
-
-   if (dt->ct==0)
-      {
-      Xecho("%8d %2d %s (%4.4s)\n",om1.imno,om1.rating, ia.get(om1.imno,"Title"), ia.get(om1.imno,"Year"));
-      ct++;
-      }
-    delete dt;
-    }
-Xecho("%d missing movies listed\r\n",ct);
-for (int i=0;i<100;i++) if (loct[i]) Xecho("Films%02d: %d\n",i,loct[i]);
-Xecho("REDIRECT O/P AND SORT USING\nsort -k2,2nr t.t > t.srt\n");
-memtake(loct);
-}
 
 static int getrh(HDL db, RHDL *rh, char *buf)
 {
@@ -352,10 +300,30 @@ flclose(f);
 printf("Restored %d records to %s\n",btrnkeys(om_btr),dbfnam(db));
 }
 
-//const char* USRTXT::get(void)
+USRTXT::USRTXT(int32_t num, OMDB1 *_om)
+{
+imno=num;
+if (_om==NULL)
+   {
+   om_passed=false;
+   om=new OMDB1(!user_not_steve);
+   }
+else
+   {
+   om_passed=true;
+   om=_om;
+   }
+}
+
+USRTXT::~USRTXT()
+{
+if (!om_passed) delete om;
+}
+
+void USRTXT::put(const char *t) {om->put_notes(imno,t);}
+
 std::string USRTXT::get(void)
 {
-//return((const char*)om->get_notes(imno));
 return(om->get_notes(imno));
 }
 

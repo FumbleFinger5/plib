@@ -34,6 +34,7 @@ int	    flcloseall(void);
 void	flckpt(HDL);
 int 	fleof(HDL);
 ushort	flget(void*,ushort,HDL);
+int32_t	flget_int32_t(void*,int32_t,HDL);   // same as flget() except no real limit of filesize
 int 	flgetln(char*,int,HDL);
 char	*flnam(HDL h_fl);
 int 	flgetc(HDL fl);

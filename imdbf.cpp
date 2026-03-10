@@ -3,11 +3,9 @@
 #include <stdio.h>
 #include <utime.h>
 #include <stdlib.h>
-
 #include <time.h>
 #include <string.h>
 #include <cstdarg>
-
 #include "pdef.h"
 #include "db.h"
 #include "cal.h"
@@ -16,17 +14,14 @@
 #include "log.h"
 #include "memgive.h"
 #include "str.h"
-#include "smdb.h"
 #include "omdb1.h"
 #include "dirscan.h"
 #include "parm.h"
 #include "exec.h"
-
 #include "imdb.h"
 #include "imdbf.h"
 #include <json-c/json.h>
 #include "qblob.h"
-
 
 const char *gEnre[26] = {"Action","Adult","Adventure","Animation","Biography","Comedy","Crime","Drama",
 "Documentary","Family","Fantasy","Film-Noir","History","Horror","Mystery","Musical","Music","Mystery",
@@ -34,23 +29,23 @@ const char *gEnre[26] = {"Action","Adult","Adventure","Animation","Biography","C
 
 FLDX fld[NUMCOLS] =     // definitive field list in q3 "base" column number sequence
     {
-    {"recent","",'C',0},
-    {"title","Title",'L',FID_TITLE},
-    {"year","Year",'L',FID_YEAR},
-    {"rating","Rating",'C',0},
-    {"emdb","Emdb",'L',0},
-    {"imdb","IMDb",'L',FID_IMDB_NUM},
-    {"director","Director",'L',FID_DIRECTOR},
-    {"added","Added",'R',0},
-    {"seen","Seen",'R',0},
-    {"gb","Gb",'C',0},
-    {"cast","Actors",'L',FID_CAST},
-    {"runtime","Runtime",'C',FID_RUNTIME},
-    {"notes","Notes",'L',0},
-    {"notes1","MyNotes",'L',0},
-    {"rating1","MyRating",'C',0},
-    {"genre","Genre",'C',FID_GENRE},
-    {"seen1","MySeen",'C',0}
+    {"Hot",'C',0},
+    {"Title",'L',FID_TITLE},
+    {"Year",'L',FID_YEAR},
+    {"Rating",'C',FID_RATING},
+    {"Emdb",'L',0},
+    {"IMDb",'L',FID_IMDB_NUM},
+    {"Director",'L',FID_DIRECTOR},
+    {"Added",'R',0},
+    {"Seen",'R',0},
+    {"Gb",'C',0},
+    {"Actors",'L',FID_CAST},
+    {"Runtime",'C',FID_RUNTIME},
+    {"Notes",'L',0},
+    {"Notes1",'L',0},
+    {"Rating1",'C',FID_RATING1},
+    {"Genre",'C',FID_GENRE},
+    {"Seen1",'C',0}
     };
 
 char idx_fid[]={FID_IMDB_NUM, FID_GENRE, FID_CAST, FID_DIRECTOR, FID_TITLE, FID_YEAR, FID_RUNTIME, 0};
@@ -60,7 +55,14 @@ const char *get_fld_name(char fld_id)
 {
 int i=0;
 while (fld[i].fid!=fld_id) if (++i==NUMCOLS) m_finish("unknown field!");
-return(fld[i].name);
+return(fld[i].fnm);
+}
+
+char get_fld_num(const char *name)
+{
+int i=0;
+while (strcmp(fld[i].fnm,name)!=0) if (++i==NUMCOLS) m_finish("Unknown field!");
+return(i);
 }
 
 // ip is a list of comma-separated genres for the current movie
@@ -149,7 +151,7 @@ if (access(get_conf_path(fn, "imdb.fld"), F_OK ))		// mode=F_OK=0, where non-zer
 	hdr.fld_rhdl=btrist(db,DT_USR,sizeof(KYX));  // 1-char key = FLD_ID + 3 'spare' + RHDL2 (to 'allv')
 	dbsetanchor(db,recadd(db,&hdr,sizeof(hdr)));
 	dbsafeclose(db);
-    init=YES;
+   init=YES;
 	}
 db_open(fn);
 if (init)
@@ -445,7 +447,7 @@ return(true);
 
 IMDB_FLD::~IMDB_FLD()
 {
-delete imx; dbsafeclose(db);
+delete imx;
 }
 
 bool IMDB_FLD::upd(DYNAG *avd)

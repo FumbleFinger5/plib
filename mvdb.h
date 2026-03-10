@@ -1,3 +1,10 @@
+#ifndef MVDB_H
+#define MVDB_H
+
+#include "pdef.h"
+#include "db.h"
+#include "memgive.h"
+
 #pragma pack(push, 1)
 struct IMSZ
    {
@@ -8,6 +15,16 @@ struct RIM
    {
    uchar rating;
    int32_t imno;
+   };
+#pragma pack(pop)
+
+#pragma pack(push, 1)
+struct DRVDET
+   {
+   uchar number;     // the NN value of this FilmsNN drive
+   RIM rim[2];       // lowest / highest 'rating+imno' key values on this drive
+   int64_t drive_free_space;
+   char fn[128];         // empty string if offline, otherwise full path to FilmsNN folder
    };
 #pragma pack(pop)
 
@@ -23,8 +40,8 @@ struct BL_CARGO // PERMANENT dets stored in dbf btree cargo
 class MVDB : public DBX {				// Accesses "FilmsNN" database moovie.dbf
    public:
    MVDB(void);
-   ~MVDB();
    bool  get(int mode, BL_CARGO *blc, DYNTBL *tbl_imsz);
+   void get_drvdets(DYNTBL *tbl_drvdets); // populate passed table with all FilmsNN details on file
    void  del(uchar number);
    bool  upd_if_changed(BL_CARGO *blc, DYNTBL *tbl_imsz);
    private:
@@ -35,3 +52,4 @@ class MVDB : public DBX {				// Accesses "FilmsNN" database moovie.dbf
 
 char *mvdb_number2path(char *pth, int number, int mnt);    // gives fully-qualified path to FilmsNN (in media or mnt)
 
+#endif // MVDB_H

@@ -13,45 +13,38 @@ void	scrap(void **pointer);		// If non-NULL, delete & zeroise... BUT USE MACRO S
 #define SCRAP(a) {if (a) {delete (a); (a)=0;}}	//		ptr-> class object DON'T FOLLOW WITH SEMICOLON
 
 // position of 'ky' in 'tbl', or NOTFND. If non-null, set to position ky WOULD go in, if not already present
-int in_table(int *p, const void *ky, void *tbl, int ct, int sz, PFI_v_v cmp);
+int in_table(int *pos, const void *ky, void *tbl, int ct, int sz, PFI_v_v cmp);
 
-int _cdecl cp_str(char *a, char *b);
+int  cp_str(char *a, char *b);
 
-class TAG {			// A class to dynamically allocate space for any number
-public:					// of variable (elemsz=0) or fixedlen (elemsz>0) strings
-TAG	();	// and retrieve any item by number as requested
-TAG (int first);
-~TAG	();
-int leaks(void);
-private:
-int	id;
-};
-extern int first_leak;
-struct LEAK_CT {int classes, files, memblocks;};
+// These globals allow app to 'remotely' change the value we want to trap for without recompiling
+extern int sought_mem_leak;
+
 int leak_tracker(int start);
 
-class DYNAG: public TAG
+class DYNAG
 {										// Class to dynamically allocate space for any number
 public:								// of variable-length strings (_sz=0) or fixedlen items (_sz>0)
 DYNAG	(int _sz, int _ct=0);	// and retrieve any item by number as requested
 DYNAG (DYNAG *copyfrom);
 DYNAG (char *multistring, int sz);
 DYNAG (HDL db, RHDL rh);
+DYNAG (int sz, HDL db, RHDL rh);
 ~DYNAG	();
 void	*put(const void *item, int n=NOTFND);	// Add item to table & return addr
 void	*puti(int i);							// (just a little wrapper because we often store 1-2-4 byte int's in tables)
 void	*get(int n);					// Retrieve address of item 'n'
 void	del(int n);						// Delete item 'n' (use del(n)+put(n) to update)
 int	ct;								// No. of items in Category (s/b read-only!)
-int	sz;
+int	len;
+int	sz;                  // WHY IS THIS PUBLIC?????????????????????????????????????????????????
 int	in(const void *item);			// Return subscript of 'item' if in table, else NOTFND
 int	in_or_add(const void *k);
-void	*cargo(const void *data, int sz=0);	// general-purpose storage area within the class object (default=NULL=unallocated)
+void	*cargo(const void *data, int sz=0);
 int	total_size(void);		// total size of table (incl EOS of final string if sz=0)
 protected:
 int	find_str(int *p, const void *k);
 char	*dta;
-int	len;
 private:
 void	init(int _sz, int _ct);
 DYNAG	*slave;							// Offset of each entry in main table if vari-length (elemsz=0)
@@ -59,6 +52,7 @@ int	eot,cargo_sz;
 void	*_cargo;						// (app code can't directly access the private cargo pointer)
 };
 
+// cargo = 	// general-purpose storage area within the class object (default=NULL=unallocated)
 // **** Note - 'put(0)' squeezes table to eliminate alloc'ed slack at end
 
 
@@ -73,6 +67,7 @@ int	in(const void *k);
 int	in_or_add(const void *k);
 int	in_GE(const void *k);	// EQV in() except it returns subscript as per BK_GE (if there is such a key in table)
 void	*find(const void *k);
+void	*find_or_add(const void *k);
 void	merge(DYNTBL *add);
 int		set_cp(PFI_v_v _cp);
 private:
@@ -111,5 +106,11 @@ void	load(const char *blob);
 private:
 DYNAG *tbl;
 };
+
+char *dynag2multistring(DYNAG *d, int *sz);  // extract variable-length DYNAG records into allocated multistring
+void zrec2dynag(DYNAG *tbl, HDL db, RHDL rh);
+
+uchar condense_filesize(int64_t filesize);         // squash filesize (min 10Mb, max 10Gb) into a single byte 
+int64_t expand_filesize(uchar condensed_value);    // convert squashed single byte back to approx size >= 10Mb, <= 10Gb
 
 #endif

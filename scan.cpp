@@ -9,6 +9,7 @@
 #include "str.h"
 #include "imdb.h"
 #include "imdbf.h"
+#include "omdb1.h"
 #include "scan.h"
 
 SCAN_ALL::SCAN_ALL(void)	// Class to handle 'cached' values gotten by api calls
@@ -80,4 +81,28 @@ for (int i=0;i<fct;i++)
 	else delete ((DYNAG*)ff->ph);
 	}
 memtake(_ff);
+}
+
+
+TITLER::TITLER(OMDB1 *_om) {om=_om; sa=new SCAN_ALL();};
+TITLER::~TITLER() {SCRAP(sa);};
+
+char* TITLER::fmt_title(OM1_KEY *k)
+{
+int year=0;
+if (k->notes!=0)
+   {
+   USRTXT ut(k->imno,om);
+   DYNAG *d=ut.extract("year");
+   if (d->ct>1) m_finish("multiple years!");
+   if (d->ct!=0) year=a2i((char*)d->get(0),0);
+   delete d;
+   }
+if (year==0)
+   year=a2l(sa->get(k->imno,FID_YEAR,buf),0);
+if (k->mytitle!=0)
+   om->rh2str(k->mytitle,buf);
+else
+   sa->get(k->imno,FID_TITLE,buf);
+return(strendfmt(buf," (%4d)",year));
 }

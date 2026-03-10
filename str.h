@@ -5,6 +5,25 @@
 #define	STR_RJUST 	1
 #define	STR_CENTER 	2
 
+#define RESET   "\033[0m"
+#define BLACK   "\033[30m"      /* Black */
+#define RED     "\033[31m"      /* Red */
+#define GREEN   "\033[32m"      /* Green */
+#define YELLOW  "\033[33m"      /* Yellow */
+#define BLUE    "\033[34m"      /* Blue */
+#define MAGENTA "\033[35m"      /* Magenta */
+#define CYAN    "\033[36m"      /* Cyan */
+#define WHITE   "\033[37m"      /* White */
+#define BOLDBLACK   "\033[1m\033[30m"      /* Bold Black */
+#define BOLDRED     "\033[1m\033[31m"      /* Bold Red */
+#define BOLDGREEN   "\033[1m\033[32m"      /* Bold Green */
+#define BOLDYELLOW  "\033[1m\033[33m"      /* Bold Yellow */
+#define BOLDBLUE    "\033[1m\033[34m"      /* Bold Blue */
+#define BOLDMAGENTA "\033[1m\033[35m"      /* Bold Magenta */
+#define BOLDCYAN    "\033[1m\033[36m"      /* Bold Cyan */
+#define BOLDWHITE   "\033[1m\033[37m"      /* Bold White */
+//printf("%s%s%s%s", BOLDYELLOW, "yellow text", RESET, "normal text"]);
+
 
 char	*strancpy(char *dst, const char *src, int bufsz); // NE Ansi - mine ALWAYS appends eos null
 char  *stradup(const char *s);	// NE Ansi - mine uses memgive() memory allocator
@@ -26,16 +45,13 @@ char  *strip(char *str, char chr); // remove any & all occurences of 'chr' in 's
 char	*strjust(char* str, int width, int type, int fillchr);
 char	*strnfmt(char*, int len, const char*,...);
 char	*strrjust(char* str, int width);
-int	strtoken(char*,char*,char*);
+//int	strtoken(char*,char*,char*);
 char	*strtrim(char*);				// Remove leading AND trailing white space
 char	*strxlt(char *str, char from, char to);
 char	*strcommas2tabs(char *csvbuf);   // convert field-separating (NOT within quoted strings) commas to tabs
-//char  *Strlast4(const char *str);      // return ptr-> last 4 chars (useful for checking file extensions]
-//char  *str_filesize(int64_t sz);        // return ptr-> static buffer formatted as <n> "bytes, Kb, Mb, Gb,..."
-char *str_size64(int64_t size);
+char *str_size64(int64_t size);     // inverse of int64_t a264(const char *str)
 void str_slash2dash(char *title);      /// change any slashes to dashes in titles that can be file/foldername
-
-
+int32_t str2imno(const char *s);    // skip optional leading _ and 'tt' before a2l()
 
 bool  strget_yn(char *buf, int bufsz, const char *prompt=NULL);
 bool  strget_yn_loop(const char *prompt);       // only returns when either 'y' or 'n' keyed
@@ -44,12 +60,12 @@ bool  strget_yn_loop(const char *prompt);       // only returns when either 'y' 
 bool	same_alnum(const char *a, const char *b);	// Are strings "the same" ignoring any non-alphanumeric chars?
 
 char	*vb_field(const char *rec, int n);
-char  *tabify(char *str); // Convert non-quotated commas to tabs
+char    *tabify(char *str); // Convert non-quotated commas to tabs
 
 int     dot2i(const char *s);    // if s contains 2 digits separated by '.' return 10x the number, else NOTFND
 
 ushort	a2i(const char *str, int len);
-Ulong	a2l(const char *str, int len);
+uint32_t	a2l(const char *str, int len);
 int64_t a264(const char *s);    // convert 3-digit (up to 1 decimal place) value + T/G/M/K/B to int64
 int		a2l_signed(const char *str, int len);
 extern	int a2err, a2err_char;			// Error on last call to a2l() (0=OK, 1=Fail, 2=EmptyString. If 1, a2err_char is the non-digit we found

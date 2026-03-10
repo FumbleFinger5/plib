@@ -1,10 +1,9 @@
 #include <dirent.h>
 
-char *drfullpath(char *path, const char *p);		// Return FULLPATH which NEVER ends in '\'
-char *drfullpath(char *in_situ_path);	// as 2-param version, but updates passed param IN SITU
-char *drfulldir(char *fullpath, const char *path);	// Return FULLPATH which ALWAYS ends in '/'
-
-int drunlink(const char *filename);
+char  *drfullpath(char *path, const char *p);		// Return FULLPATH which NEVER ends in '\'
+char  *drfullpath(char *in_situ_path);	// as 2-param version, but updates passed param IN SITU
+char  *drfulldir(char *fullpath, const char *path);	// Return FULLPATH which ALWAYS ends in '/'
+int   drunlink(const char *filename);
 
 
 struct FILEINFO
@@ -15,27 +14,27 @@ struct FILEINFO
 	char	name[255];	// name of file (or directory)
 	};
 
-DIR		*drscnist(const char *path);
-
-int		drscnnxt(DIR *scn, FILEINFO *fi);
+DIR   *drscnist(const char *path);
+int	drscnnxt(DIR *scn, FILEINFO *fi);
 void	drscnrls(DIR *scn);
 
-bool drinfo(const char *path, FILEINFO *pfile_info);
-int drisdir(const char *directory_path);
-bool drisvid(const char *extension);
+bool  drinfo(const char *path, FILEINFO *pfile_info);
+int   drisdir(const char *directory_path);
+bool  drisvid(const char *extension);
 const char *drext(const char *directory_path);
-bool drattrget(const char *path, short *attr); // YES if file exists (fill optional 'attr')
+bool  drattrget(const char *path, short *attr); // YES if file exists (fill optional 'attr')
+bool  dr_set_dttm(const char *path, int32_t dttm);
 
 int megabytes(int64_t size);  // DON'T USE! Just use size/1000000
-uint64_t get_free_space(const char *path);  // drive free space (bytes)
-
-bool unwanted_filename(const char *n);	// YES if it's a rarbg / yts / yify torrent file that we don't want
+uint64_t dr_free_space(const char *path);  // drive free space (bytes)
 
 
 int64_t dr_filesize(const char *fn);		// the actual code uses #ifdef to compile special Raspberry Pi version
 int64_t dr_foldersize(const char *pth);	// Recursively sum total size of specified folder
 
 char  *drsplitpath(char *dir_part, const char *fullpath);	// basename() and dirname() give same results!
+
+bool unwanted_filename(const char *n);	// YES if it's a rarbg / yts / yify torrent file that we don't want
 
 char *Basename(const char *fullpath);		// 'safe' wrapper copies fullpath to ensure it's not modified
 char *Dirname(const char *fullpath);		// 'safe' wrapper copies fullpath to ensure it's not modified

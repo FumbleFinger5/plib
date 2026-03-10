@@ -191,7 +191,7 @@ void exec_rename(const char *from, const char *to)
 {
 char cmd[1024];
 int statusflag;
-strfmt(cmd, "%s %c%s%c %c%s%c", "mv", CHR_QTDOUBLE, from, CHR_QTDOUBLE, CHR_QTDOUBLE, to, CHR_QTDOUBLE);
+strfmt(cmd, "%s %c%s%c %c%s%c", "mv", QTDOUBLE, from, QTDOUBLE, QTDOUBLE, to, QTDOUBLE);
 int id = fork();
 if (id == 0) // then it's the child process
 	execlp("/bin/sh", "/bin/sh", "-c", cmd, (char *)NULL);
@@ -230,6 +230,5 @@ void escape_ampersand(char *s)	// replace every occurence of "&" with "&amp;" an
 int p;
 while ((p=stridxc('&',s))!=NOTFND) s[p]='\t';
 while ((p=stridxc('\t',s))!=NOTFND) strins(strdel(&s[p],1),"&amp;");
-//while ((p=stridxc(CHR_QTSINGLE,s))!=NOTFND) strins(strdel(&s[p],1),"%27");
 easy_escape_in_situ(s);
 }

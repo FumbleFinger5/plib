@@ -7,6 +7,7 @@
 #include "pdef.h"
 #include "str.h"
 #include "memgive.h"
+#include "log.h"
 
 int a2err;			// 0 = a2l() succeeded, 1 = a2l() failed (hit non-digit as stored in a2err_char), 2 = failed with empty i/p string
 int	a2err_char;
@@ -192,10 +193,11 @@ for (s=str;--n;s=&s[comma+1])
 return(s);
 }
 
-void str_slash2dash(char *title)
+void str_slash2dash(char *title) // Convert any slashes in movie title to dashes, and delete any asterisks
 {
 int i;
 while ((i=stridxc(CHR_SLASH,title))!=NOTFND) title[i]=CHR_DASH;
+while ((i=stridxc('*',title))!=NOTFND) strdel(&title[i],1);
 }
 
 char *str_size64(int64_t size)      // format int64 as str - reverse of a264(str)
@@ -217,31 +219,16 @@ else
    strfmt(buf, "%.1f%s", display_size, units[unit_index]);
 return(buf);
 }
-/*
-char *str_filesize(int64_t filesize)
+
+int32_t str2imno(const char *s)
 {
-static char formatted[16];
-static const char *units[] = {"bytes", "Kb", "Mb", "Gb", "Tb"};
-int i = 0;
-int64_t prv=0;
-while (filesize > 1024 && i < sizeof(units)/sizeof(units[0]) - 1) {prv=filesize; filesize /= 1024; i++;}
-int i1=filesize;
-int i3=((prv&1023)+50)/100;
-if (i3>9) i3=9;
-
-strfmt(formatted,"%d",i1);
-if (i1<100)
-{strendfmt(formatted,".%d",i3);}
-return(strendfmt(formatted,"%s",units[i]));
-
-//sprintf(formatted, "%.1f %s", (double)filesize, units[i]);
-sprintf(formatted, "%d.%d%s", i1,i3, units[i]);
-return formatted;
-}*/
-
+if (*s=='_') s++;
+if (SAME2BYTES(s,"tt")) s+=2;
+return(a2l(s,0));
+}
 
 // get/put _binary124 use Intel "backwords" native binary storage mode
-Ulong get_binary124(const void *addr, int len, int sub)
+uint32_t get_binary124(const void *addr, int len, int sub)
 {
 switch (len)
 	{
@@ -251,13 +238,13 @@ switch (len)
 	}
 }
 
-void put_binary124(void *addr, Ulong value, int len, int sub)
+void put_binary124(void *addr, uint32_t value, int len, int sub)
 {
 switch (len)
 	{
 	case 1: ((char*)addr)[sub]=(char)value; break;
 	case 2: ((ushort*)addr)[sub]=(ushort)value; break;
-	default: ((Ulong*)addr)[sub]=value;
+	default: ((uint32_t*)addr)[sub]=value;
 	}
 }
 
@@ -289,12 +276,12 @@ return(i);
 }
 
 
-Ulong r2l(const char *s)
+uint32_t r2l(const char *s)
 {
 return ((((long)s[0])<< 24) | (((long)s[1])<< 16) | (((short)s[2])<<8) | s[3]);
 }
 
-Ulong r2long(char *ad, int len)
+uint32_t r2long(char *ad, int len)
 {
 switch (len)
 	{
@@ -305,10 +292,10 @@ switch (len)
 }
 
 
-Ulong a2l(const char *s,int ct)
+uint32_t a2l(const char *s,int ct)
 {
 int i,c;
-Ulong result;
+uint32_t result;
 result = i = 0;
 if (!ct) ct = strlen(s);
 while (s[i]==' ' && ct) {ct--;i++;}
@@ -354,7 +341,7 @@ return(a2l(str,len));
 
 ushort a2i(const char *s,int ct){return (ushort)a2l(s,ct);}
 
-char *l2r(Ulong n)
+char *l2r(uint32_t n)
 {
 static char c[4];
 c[0] = (char)(n >> 24);
@@ -448,7 +435,7 @@ char *p;
 bool qt=false;
 for (p=csvbuf; *p; p++)
 	{
-	if (*p==CHR_QTDOUBLE) qt=!qt;
+	if (*p==QTDOUBLE) qt=!qt;
 	if (!qt && *p==COMMA) *p=TAB;
 	}
 if (qt) m_finish("Internal error 802 - unterminated quoted string\n%s",csvbuf);
@@ -460,13 +447,6 @@ char *strend(const char *s)
 {
 return (char *)&s[strlen(s)];
 }
-
-/*char  *Strlast4(const char *str)    // return ptr to last 4 chars (starting with '.' if 3-char file extension]
-{
-int len=strlen(str);
-if (len>=4) return((char*)&str[len-4]);	// ptr -> the period before 3-char file extension
-return((char*)str);  							// if passed string < 4 chars just return it
-}*/
 
 char *stradup(const char *s)	// NOT same as std library strdup() - uses my memgive() memory allocator
 {
@@ -624,7 +604,7 @@ char *s=str, c;
 strcat(s,","); // append comma to delineate the final element for vb_field()
 for (bool qt=false; (c=*s)!=0; s++)
    if (c==COMMA && !qt) *s=TAB;
-   else if (c==CHR_QTDOUBLE) qt=!qt;
+   else if (c==QTDOUBLE) qt=!qt;
 return(str);
 }
 
@@ -657,3 +637,5 @@ while (!ok)
 printf("\n");
 return(ok);
 }
+// dummy change
+

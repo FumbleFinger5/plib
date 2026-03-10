@@ -44,7 +44,7 @@ static void  doswrite(const void *buf,ushort n, PF_FIL *pf)
 {
 if	(write(pf->fd,buf,n) < 0)
 	{
-	SetErrorText("WRITE error. File %s",pf->fnam);
+	SJHLOG("WRITE error. File %s",pf->fnam);
 	throw(SE_BADWRITE);
 	}
 }
@@ -55,9 +55,9 @@ char *flnam(HDL h_fl) {return(H_FL->fnam);}
 
 int fleof(HDL h_fl) {return(H_FL->flag&FIL_EOF);}
 
-					// This flag controls whether to log extended error if flopen fails
+					// This flag controls whether to log extended error if Flopen fails
 int flopen_status;	// 0 = Default = Log all except "File not found"
-					// 1 = Called thru flopen_trap = Log ALL errors
+					// 1 = Called thru Flopen_trap = Log ALL errors
 					// 2 = Attempting to open sjh.log = NEVER log!
 
 
@@ -232,6 +232,24 @@ if	(!ct) pf->flag|=FIL_EOF;
 return((ushort)ct);
 }
 
+
+// returns total number of bytes read
+/*int32_t	flget_int32_t(void *data,int32_t n,HDL h_fl)
+{
+int bytes, total;
+for (total=0; n>0 && (bytes=flget(data,65535,h_fl))!=0; n-=bytes) total+=bytes;
+return(total);
+}*/
+int32_t	flget_int32_t(void *data,int32_t n,HDL h_fl)
+{
+int bytes, total;
+char *d=(char*)data;
+for (total=0; n>0 && (bytes=flget(d,65535,h_fl))!=0; n-=bytes)
+   {total+=bytes; d+=bytes;}
+return(total);
+}
+
+
 // Return the Ascii code of character read, or -1 if EOF or a ^Z
 int flgetc(HDL h_fl)
 {
@@ -324,7 +342,7 @@ void flput(const void *data, int n, HDL h_fl)
 PF_FIL *pf=(PF_FIL*)h_fl;
 if	(pf->mode==READ)
 	{
-	SetErrorText("Illegal WRITE. ReadOnly file %s",pf->fnam);
+	SJHLOG("Illegal WRITE. ReadOnly file %s",pf->fnam);
 	throw SE_RD_ONLY;
 	}
 if	(pf->fbuf)
@@ -334,7 +352,8 @@ if	(pf->fbuf)
 		{doswrite(pf->fbuf,(ushort)(remain=FBUFSZ),pf); pf->at_byte=0;}
 	memmove(pf->fbuf+pf->at_byte,data,ct=MIN(remain,n));
 	pf->at_byte = (short)(pf->at_byte + ct);
-	if	(ct < n) {flput((char*)data+ct,n-ct,h_fl); ct=n;}
+	if	(ct < n)
+      {flput((char*)data+ct,n-ct,h_fl); ct=n;}
 	}
 else doswrite(data,(ushort)n,pf);
 if	((pf->flag&(FIL_DBF|FIL_DIRTY))==FIL_DBF)		// IF this is the first 'write' to a DBF file...

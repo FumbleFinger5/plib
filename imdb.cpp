@@ -16,7 +16,7 @@
 #include "log.h"
 #include "memgive.h"
 #include "str.h"
-#include "smdb.h"
+//#include "smdb.h"
 #include "omdb1.h"
 #include "dirscan.h"
 #include "parm.h"
@@ -25,6 +25,7 @@
 #include "imdb.h"
 #include "my_json.h"
 #include "qblob.h"
+
 
 IMDB_API::IMDB_API(const char *override_fn)
 {
@@ -123,43 +124,40 @@ else
 }
 
 
-IMDB_API::~IMDB_API() {dbsafeclose(db);delete jss4;}
+IMDB_API::~IMDB_API() {delete jss4;}
 
+#define omdb_fail "{\"Response\":\"False\""
+
+static bool call_omdb_api(const char *cmd, char *buf8k)
+{
+int err=exec_cmd(cmd, buf8k, 8192);
+if (err) {sjhLog("OMDBapi call FAILED: %s",cmd); sjhLog("FAIL buffer [%s]",buf8k); throw(83);}
+if (stridxs("Request limit reached!",buf8k)!=NOTFND)
+    {sjhLog("API limit reached for key %s",apikey()); return(false);}
+if (strlen(buf8k)>strlen(omdb_fail) && !memcmp(buf8k,omdb_fail,strlen(omdb_fail)))
+   {/*if (bugger) sjhlog("%s\nAbove call returned...\n%s\n",cmd,buf8k);*/ return(false);} // 7/2/26 no 'bugger'
+return(true);
+}
 
 // Call API with ImdbNo. Populate passed 'buf' with the values returned by api
 bool omdb_all_from_number(int32_t imno, char *buf8k)
 {
 char cmd[256];
 strfmt(cmd,"%s%s&i=tt%07d' %s", "curl 'http://www.omdbapi.com/?apikey=", apikey(), imno, STD_ERRNULL);
-int err=exec_cmd(cmd, buf8k, 8192);
-if (err) {sjhLog("OMDBapi call FAILED: %s",cmd); sjhLog("FAIL buffer [%s]",buf8k); throw(83);}
-if (stridxs("Request limit reached!",buf8k)!=NOTFND)
-    {sjhLog("API limit reached for key %s",apikey()); return(false);}
-return(true);
+return(call_omdb_api(cmd,buf8k));
 }
-
-#define omdb_fail "{\"Response\":\"False\""
 
 bool omdb_all_from_name(const char *name, int year, char *buf8k)
 {
 char cmd[256], ucn[128];    // URL_compiant_name
-
 strcpy(ucn,name);
 strxlt(ucn,SPACE,'+');
 escape_ampersand(ucn);
 char *p;
-//while ((p=strchr(ucn,CHR_QTSINGLE))!=NULL) strins(strdel(p,1),"%27");
-//while ((p=strchr(ucn,AMPERSAND))!=NULL) strins(strdel(p,1),"%26");
-
 strfmt(cmd,"%s%s%s%s","curl 'https://www.omdbapi.com/?apikey=", apikey(), "&t=", ucn);
-strendfmt(cmd,"&y=%d' %s",year, STD_ERRNULL);
-int err=exec_cmd(cmd, buf8k, 8192);
-//sjhlog("%s:%d\n%s","Api_all_from_name",err,cmd);
-// IF buffer contains "Incorrect IMDb ID." THEN call themoviedb instead
-//sjhlog("%s",buf8k);
-// {"Response":"False"
-if (!err && strlen(buf8k)>strlen(omdb_fail) && !memcmp(buf8k,omdb_fail,strlen(omdb_fail)))
-   err=123;
-return(err==0);
+if (year!=NOTFND) strendfmt(cmd,"&y=%d",year);
+strendfmt(cmd,"' %s", STD_ERRNULL);
+//sjhlog("%s",cmd);
+return(call_omdb_api(cmd,buf8k));
 }
 

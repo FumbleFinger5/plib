@@ -15,13 +15,11 @@
 // Only define MEMLOG when troubleshooting (don't want the overrhead in normal operation)
 //#define MEMLOG 1
 
-int first_leak;
+static int first_mem_leak;
+int sought_mem_leak;
+
 
 static int		uniq;
-
-static TAG		*logger;
-static DYNTBL	*log;
-
 
 #define MAXCT 65000		// 02/12/02
 
@@ -32,6 +30,7 @@ static DYNTBL	*log;
 #define FST	0
 #define LST 0
 #endif
+
 #define EXTRA_BYTES (FST+LST)
 
 static void **mcad;
@@ -50,52 +49,48 @@ for (int i=0;i<ct;i++)
 	totsiz+=siz;
 	if ((*(int32_t*)&c[FST-4]!=0x12345678 || *(int32_t*)&c[siz+FST]!=0x87654321))
 		{
-		SetErrorText("Corrupt memory:%s",txt);
+		SJHLOG("Corrupt memory:%s",txt);
 		throw SE_MEMBAD;
 		}
 	}
 int open_file_handles_ct(void);
 char w[128];
-strfmt(w,"Open Files:%ld, Objects:%ld, MemUsed:%ld",open_file_handles_ct(),log->ct,totsiz);
+strfmt(w,"MemUsed:%ld",totsiz);
 sjhlog("%s %s",txt,w);
 #endif
 }
 
-void give_first_leak(int sz)	// breakpoint HERE after setting sought uniq value 10 lines down...
-{
-sz=ct;
-}
-
 #ifdef MEMLOG
-#define LUMP 1024		// Chunk size for extending 'dta'
+#define LUMP 1024		// Chunk size for extending 'mcad'
 static void*  log_give(void *p, Uint siz)	// *p==REAL pointer	// Log this block as 'allocated'
 {																// and return address of "app-level data portion" of block
 char *c=(char*)p;
 Uint *u=(Uint*)p;
 u[0]=siz;
 u[1]=++uniq; 
-if (uniq==2791)				// set to value of first_leak as reported by dllclosedown
-give_first_leak(siz);	// breakpoint HERE when unique sequence number of the mem_leak is allocated
+if (uniq==sought_mem_leak)			// set to value of First_leak given by leak_tracker from global_closedown
+   gbreak;            // breakpoint HERE to trap when unique sequence number of the mem_leak is allocated
 *(int32_t*)&c[FST-4]=0x12345678;				// Put our special values before and after the address returned to app,
 *(int32_t*)&c[siz+FST]=0x87654321;				// so we can check for buffer over/underrun when it's released
 
-if (ct>=MAXCT) throw SE_OUTOFHEAP;
+if (ct>=MAXCT)
+   throw SE_OUTOFHEAP;
 if (c1<=ct)
 	{
 	c1+=LUMP;
-	dta=(void**)(ct?realloc(dta,c1*sizeof(void*)):calloc(c1,sizeof(void*)));
+	mcad=(void**)(ct?realloc(mcad,c1*sizeof(void*)):calloc(c1,sizeof(void*)));
 	}
 mcad[ct++]=p;
 return(&c[FST]);
 }
 
-static void  log_take(const void *p)	// *p==PSEUDO pointer from App	// Remove this block from the
-{																		// table of 'allocated' addresses
-char *c=((char*)p)-FST;					// (get the REAL pointer to allocated memory block)
+static void  log_take(const void *p)	// *p==PSEUDO pointer from App
+{													// Remove this block from the table of 'allocated' addresses
+char *c=((char*)p)-FST;					   // (get the REAL pointer to allocated memory block)
 int32_t siz=*(Uint*)c;
 if ((*(int32_t*)&c[FST-4]!=0x12345678 || *(int32_t*)&c[siz+FST]!=0x87654321))
 	{
-	SetErrorText("Corrupt memory block over/underrun");
+	SJHLOG("Corrupt memory block over/underrun");
 	throw SE_MEMBAD;
 	}
 for (int	i=ct;i--;)
@@ -164,8 +159,8 @@ if (*pointer)
 	}
 }
 
-int memtakeall(void)						// Release all blocks allocated by
-{											// by memgive() or memrealloc()
+int memtakeall(void)		// Release any blocks allocated by memgive/memrealloc but not released by memtake
+{								// grab the ID of the first such unreleased block so we can examine it in debugger 
 int leak=ct;
 while (ct)
 	{
@@ -174,8 +169,8 @@ while (ct)
 		int32_t *pi=(int32_t*)mcad[ct-1];
 //		int sz=pi[0];				// get the (app-requested) allocated block size,
 		int32_t sq=pi[1];				// - unique sequence number, (of this mem_leak)
-		if (!first_leak)
-			first_leak=sq;			// LINK01 
+		if (!first_mem_leak)
+			first_mem_leak=sq;			// LINK01 
 //		char *data=(char*)&pi[3];	// - and 'pointer to app-perceived data area'
 		}							// so we can track down where it got allocated by the app
 #endif
@@ -190,19 +185,20 @@ return(leak);
 }
 
 #define T(i) &((char*)tbl)[(i)*sz]
-int in_table(int *p, const void *ky, void *tbl, int c, int sz, PFI_v_v cmp)
+// Is 'ky' in SORTED 'tbl'? If so return subscript into table, else NOTFND
+int in_table(int *pos, const void *ky, void *tbl, int ct, int sz, PFI_v_v cmp)
 {
 int	m,lo,hi,i;
-if (!p) p=&i;					// 'dummy' address so it's not NULLPTR
+if (!pos) pos=&i;					// 'dummy' address so it's not NULLPTR
 m=lo=0;
-hi=c-1;
+hi=ct-1;
 while (lo<=hi)
 	{
 	m=((int32_t(hi)+lo)/2);
-	if ((i=(cmp)(ky,T(m)))==0) return(*(p)=m);
+	if ((i=(cmp)(ky,T(m)))==0) return(*(pos)=m);
 	if (i<0) hi=m-1; else lo=m+1;
 	}
-*(p)=m+(m<c && (cmp)(ky,T(m))>0);
+*(pos)=m+(m<ct && (cmp)(ky,T(m))>0);
 return(NOTFND);
 }
 
@@ -287,6 +283,50 @@ for (char *p=multistring; sz>0; sz-=len)
     p+=(len=strlen(p)+1);
     }
 memtake(multistring);
+}
+
+void zrec2dynag(DYNAG *tbl, HDL db, RHDL rh)
+{
+int tot_sz, ct, i;
+char *w=(char*)zrecmem(db,rh,&tot_sz);
+ct=tot_sz/tbl->len;
+if (tbl->len*ct!=tot_sz)
+	{
+	SJHLOG("ct:%d tot_sz:%d tbl->len:%d",ct,tot_sz,tbl->len);
+	m_finish("sizze rror!");
+	}
+for (i=0; i<ct; i++) tbl->put(&w[i*tbl->len]);
+memtake(w);
+}
+
+// (not yet used)
+DYNAG::DYNAG(int sz, HDL db, RHDL rh)	// constructor (for fixedlen recs) initialised from zrec array
+{
+int tot_sz, ct, i;
+char *w=(char*)zrecmem(db,rh,&tot_sz);
+ct=tot_sz/sz;
+if (sz*ct!=tot_sz) m_finish("sizze rror!");
+init(sz,ct);
+for (i=0; i<ct; i++) put(&w[i*sz]);
+memtake(w);
+}
+
+char *dynag2multistring(DYNAG *d, int *sz)  // extract variable-length DYNAG records into allocated multistring
+{
+char *buf;
+for (int i=*sz=0;i<d->ct;i++)
+   {
+   char *p=(char*)d->get(i);
+   int len1=strlen(p)+1;
+   if (*sz==0) buf=stradup(p);
+   else
+      {
+      buf=(char*)memrealloc(buf,*sz + len1);
+      strcpy(&buf[*sz],p);
+      }
+   *sz+=len1;
+   }
+return(buf);
 }
 
 DYNAG::~DYNAG(void)
@@ -427,6 +467,13 @@ void* DYNTBL::find(const void *k)
 return(get(in(k)));
 }
 
+void* DYNTBL::find_or_add(const void *k)
+{
+void *p=get(in(k));
+if (p==NULL) p=put(k);
+return(p);
+}
+
 
 int DYNTBL::in(const void *k)
 {
@@ -461,7 +508,7 @@ return(p);
 }
 
 static const char *_aaa, *_kkk;
-static int _cdecl cp_slave(int *aa, int *bb)
+static int  cp_slave(int *aa, int *bb)
 {
 return(strcmp((*aa==NOTFND)?_kkk:&_aaa[*aa],(*bb==NOTFND)?_kkk:&_aaa[*bb]));
 }
@@ -535,7 +582,7 @@ if (!no_save) save_to_disc();
 }
 
 
-PATHDYNAG::PATHDYNAG(const char *fullpath):DYNAG(0,0)
+PATHDYNAG::PATHDYNAG(const char *fullpath):DYNAG(0,0) // Split all the subdir legs within passed path into a DYNAG
 {
 char wrk[PATH_MAX], *p;
 int i;
@@ -574,23 +621,23 @@ char w[200];
 va_list va;
 va_start(va,fmt);
 _strfmt(w,fmt,va);
-printf("%s\r\n",w);
+printf("\n%s\n\n",w);
 sjhlog("%s",w);
 throw 222;
 }
 
 
-int _cdecl cp_mem1(const void *a, const void *b) {return(memcmp(a,b,1));}
-int _cdecl cp_mem2(const void *a, const void *b) {return(memcmp(a,b,2));}
-int _cdecl cp_mem3(const void *a, const void *b) {return(memcmp(a,b,3));}
-int _cdecl cp_mem4(const void *a, const void *b) {return(memcmp(a,b,4));}
-int _cdecl cp_mem6(const void *a, const void *b) {return(memcmp(a,b,6));}
-int _cdecl cp_mem8(const void *a, const void *b) {return(memcmp(a,b,8));}
+int  cp_mem1(const void *a, const void *b) {return(memcmp(a,b,1));}
+int  cp_mem2(const void *a, const void *b) {return(memcmp(a,b,2));}
+int  cp_mem3(const void *a, const void *b) {return(memcmp(a,b,3));}
+int  cp_mem4(const void *a, const void *b) {return(memcmp(a,b,4));}
+int  cp_mem6(const void *a, const void *b) {return(memcmp(a,b,6));}
+int  cp_mem8(const void *a, const void *b) {return(memcmp(a,b,8));}
 
 int cp_short_v(short a, short b)	{return((a<b)?-1:(a>b));}
 int cp_ushort_v(ushort a, ushort b){return((a<b)?-1:(a>b));}
 int cp_long_v(int32_t a, int32_t b)		{return((a<b)?-1:(a>b));}
-int cp_ulong_v(Ulong a, Ulong b)	{return((a<b)?-1:(a>b));}
+int cp_ulong_v(uint32_t a, uint32_t b)	{return((a<b)?-1:(a>b));}
 
 int cp_short(const void *a, const void *b)
 {return((*((short*)a)<*((short*)b))?-1:(*((short*)a)>*((short*)b)));}
@@ -601,35 +648,32 @@ int cp_ushort(const void *a, const void *b)
 int cp_long(const void *a, const void *b)
 {return((*((int32_t*)a)<*((int32_t*)b))?-1:(*((int32_t*)a)>*((int32_t*)b)));}
 
-int cp_int32_t(const void *a, const void *b)
-{return((*((int32_t*)a)<*((int32_t*)b))?-1:(*((int32_t*)a)>*((int32_t*)b)));}
+int cp_ulong(const void *a, const void *b)
+{return((*((uint32_t*)a)<*((uint32_t*)b))?-1:(*((uint32_t*)a)>*((uint32_t*)b)));}
 
 int cp_int64_t(const void *a, const void *b)
 {return((*((int64_t*)a)<*((int64_t*)b))?-1:(*((int64_t*)a)>*((int64_t*)b)));}
 
-int cp_ulong(const void *a, const void *b)
-{return((*((Ulong*)a)<*((Ulong*)b))?-1:(*((Ulong*)a)>*((Ulong*)b)));}
-
-static int _cdecl cp_ulongn(const Ulong *a, const Ulong *b, int n)
+static int  cp_ulongn(const uint32_t *a, const uint32_t *b, int n)
 {
 int i,cmp;
 for (i=cmp=0;!cmp && i<n;i++) cmp=cp_ulong_v(a[i],b[i]);
 return(cmp);
 }
 
-int _cdecl cp_ulong2(const void *a, const void *b) {return(cp_ulongn((Ulong*)a,(Ulong*)b,2));}
-int _cdecl cp_ulong4(const void *a, const void *b) {return(cp_ulongn((Ulong*)a,(Ulong*)b,4));}
+int  cp_ulong2(const void *a, const void *b) {return(cp_ulongn((uint32_t*)a,(uint32_t*)b,2));}
+int  cp_ulong4(const void *a, const void *b) {return(cp_ulongn((uint32_t*)a,(uint32_t*)b,4));}
 
-static int _cdecl cp_shortn(const short *a, const short *b, int n)
+static int  cp_shortn(const short *a, const short *b, int n)
 {
 int i,cmp;
 for (i=cmp=0;!cmp && i<n;i++) cmp=cp_short_v(a[i],b[i]);
 return(cmp);
 }
 
-int _cdecl cp_short2(const void *a, const void *b) {return(cp_shortn((short*)a,(short*)b,2));}
+int  cp_short2(const void *a, const void *b) {return(cp_shortn((short*)a,(short*)b,2));}
 
-int _cdecl cp_str(char *a, char *b)
+int  cp_str(char *a, char *b)
 {
 int cmp=strcmp(a,b);
 if (cmp<0) return(-1);
@@ -638,94 +682,23 @@ return(0);
 }
 
 
-static int zct;
+static int tag_id;   // incrementing unique id assigned to each TaG object (DYNag/tbl) for leak checks
 
-TAG::TAG()	// This is the 'implicit' TAG constructor (no parameter passed to constructor)
-{				// that gets called whenever a derived class (DYNAG or DYNTBL) is initialised
-if (log)
-	{
-	id=++zct;
-if (id==18)
-{
-//assert(0);
-if (zct<0) exit(9);				// run to cursor HERE to Find when class_leak 'id' was instantiated
-}
-	void *ptr=(void*)this;
-	log->put(&ptr);
-	}
-else id=NO;
-}
 
-TAG::TAG(int first)	// FIRST call is 'explicit' - invoked by leak_tracker(YES) at program start
-{		// Subsequent DYNAG/DYNTBL constructors 'implicitly' create TAGs without parameter, FOR LOGGING
-first=first; // ??????? what's this param for ?????
-log=new DYNTBL(8,cp_int64_t);
-id=NOTFND;
-}
-
-int TAG::leaks(void)
-{
-DYNTBL *w=log;
-log=0;
-int i,ct;
-for (i=ct=0;i<w->ct;i++)
-	{
-	void *v=w->get(i);
-	TAG *t=*(TAG**)v;
-	int leak=t->id;
-if (!first_leak)
-{
-first_leak=leak*10+1;
-//assert(first_leak!=11);
-}
-	ct++;
-	}
-delete w;
-return(ct);
-}
-
-TAG::~TAG()
-{
-if (log)
-	{
-	if (id>0)
-		{
-		void *ptr=(void*)this;
-		int ck=log->ct;
-		log->del(log->in(&ptr));
-		if (log->ct!=ck-1) m_finish("dammit");
-		}
-	if (id==NOTFND)
-		{
-		if (leaks())
-			m_finish("Logged Class instances not released!");
-		}
-	}
-}
-
-int leak_tracker(int start)
-{
+int leak_tracker(int start)   // Called with start=YES before running the code (whole program?) being monitored
+{                             // Called AFTER the code has finished with start=NO (check all alloc's were freed)
 #ifndef MEMLOG
 return(0);
 #endif
 if (start)
 	{
-	assert(logger==0);
-	logger=new TAG(YES);
 	return(NO);
 	}
-assert(logger!=0);
-static LEAK_CT lk;
-lk.classes=logger->leaks();
-SCRAP(logger);
-lk.files=flcloseall();				// any non=closed files?
-lk.memblocks=memtakeall();
-if (lk.classes!=0 || lk.files!=0 || lk.memblocks!=0)
-	{
-	printf("FirstLeak:%d Class:%d Files:%d MemBlks:%d\r\n", first_leak, lk.classes, lk.files, lk.memblocks);
-	return(-77);
-	}
-return(NO);
+int mem_leak_ct;
+mem_leak_ct=memtakeall();
+if (mem_leak_ct==0) return(NO);  // no leaks!
+   printf("MEMGIVE leaks:%d  First:%d\r\n", mem_leak_ct, first_mem_leak);
+return(-77);
 }
 
 DYNTUPLE::DYNTUPLE()
@@ -757,8 +730,8 @@ int i=0,j;
 TUPLE t;
 while (blob[i])
 	{
-	if (blob[i]!=CHR_QTDOUBLE) {i++; continue;}
-	for (j=1; blob[i+j]!=CHR_QTDOUBLE; j++)
+	if (blob[i]!=QTDOUBLE) {i++; continue;}
+	for (j=1; blob[i+j]!=QTDOUBLE; j++)
 		if (j>=14) m_finish("Invalid blob element name");
 	if (j==1) m_finish("Invalid Blob element name");
 	t.name=(char*)memgive(j);
@@ -776,3 +749,60 @@ for (int i=0; i<tbl->ct; i++)
 	}
 return(NULL);
 }
+
+
+#include <cmath>
+#include <cstdint>
+
+const double MIN_MB = 10.0;
+const double MAX_GB = 10.0;
+const int MIN_CVAL = 1;
+const int MAX_CVAL = 250;
+
+// Convert boundaries to bytes and use log() for the base values
+const double MIN_SIZE_BYTES = MIN_MB * 1024.0 * 1024.0;
+const double MAX_SIZE_BYTES = MAX_GB * 1024.0 * 1024.0 * 1024.0;
+
+const double LOG_MIN = std::log(MIN_SIZE_BYTES);
+const double LOG_MAX = std::log(MAX_SIZE_BYTES);
+const double LOG_SPAN = LOG_MAX - LOG_MIN;
+const double CVAL_SPAN = static_cast<double>(MAX_CVAL - MIN_CVAL);
+
+// condense approximate (video) filesize into a value between 1 and 250 (1 <=10Mb, 250 >= 10Gb)
+uchar condense_filesize(int64_t filesize)
+{
+if (filesize <= MIN_SIZE_BYTES) return MIN_CVAL;
+if (filesize >= MAX_SIZE_BYTES) return MAX_CVAL;
+// Scale the logarithmic value of the filesize to the 1-250 range
+double normalized_log = (std::log(static_cast<double>(filesize)) - LOG_MIN) / LOG_SPAN;
+double result = MIN_CVAL + (normalized_log * CVAL_SPAN);
+// Round and clamp the result to ensure it's within the 1-250 range
+return static_cast<uchar>(std::round(std::fmin(std::fmax(result, MIN_CVAL), MAX_CVAL)));
+}
+
+/* // expand condensed value 1-250 back to an approximate filesize in MB
+short expand_filesize(uchar condensed_value)
+{
+if (condensed_value <= MIN_CVAL) return static_cast<short>(MIN_MB);
+if (condensed_value >= MAX_CVAL) return static_cast<short>(1024.0 * MAX_GB);
+// Scale the condensed value back to the logarithmic range
+double normalized_cval = (static_cast<double>(condensed_value) - MIN_CVAL) / CVAL_SPAN;
+double log_reconstructed = LOG_MIN + (normalized_cval * LOG_SPAN);
+// Use exp() to convert back from the logarithmic value, then to MB
+double bytes = std::exp(log_reconstructed);
+return static_cast<short>(std::round(bytes / (1024.0 * 1024.0)));
+}*/
+int64_t expand_filesize(uchar condensed_value)
+{
+if (condensed_value <= MIN_CVAL) return static_cast<short>(MIN_MB);
+if (condensed_value >= MAX_CVAL) return static_cast<short>(1024.0 * MAX_GB);
+// Normalize the input condensed value to a 0.0-1.0 range
+double normalized_cval = (static_cast<double>(condensed_value) - MIN_CVAL) / CVAL_SPAN;
+// Scale this normalized value back to the logarithmic range of the file sizes
+double log_reconstructed = LOG_MIN + (normalized_cval * LOG_SPAN);
+// Use exp() to convert from the logarithmic value back to the actual byte value
+double estimated_bytes = std::exp(log_reconstructed);
+// Round the result to the nearest whole byte and cast to int64_t for accuracy
+return static_cast<int64_t>(std::round(estimated_bytes));
+}
+

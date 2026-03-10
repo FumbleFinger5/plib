@@ -9,13 +9,11 @@
 #include <ctype.h>
 #include <utime.h>
 #include <cstdarg>
-
 #include "pdef.h"
 #include "cal.h"
 #include "str.h"
 #include "memgive.h"
 #include "parm.h"
-#include "smdb.h"
 #include "omdb1.h"
 #include "flopen.h"
 #include "drinfo.h"
@@ -28,9 +26,7 @@
 #include "qblob.h"
 #include "my_json.h"
 #include "tmdbc.h"
-
 #include "mvdb.h"
-
 
 // CAREFUL! Block compare of both key AND data might report differences because of padding bytes or uninitialized fields!
 static bool bky_add_or_upd_if_changed(HDL btr, void *key, void *data, int recsz)
@@ -103,6 +99,42 @@ if (tbl_imsz!=NULL)     // TODO - implement DYNTBL::load_from_zrec(HDL db)
 return(true);
 }
 
+// TODO
+// change IMSZ in blc.rh zrec to new structure IMSZRD with rating+drvnum as well as imno+size 
+//  extra param DYNAG *t_imszrd(sizeof(IMSZRD))
+//        append an entry for every imno where current omdb rating doesn't match 
+// Need additional zrec in dbf, containing full list imno+rating+drvnum
+
+
+void MVDB::get_drvdets(DYNTBL *tbl_drvdet)
+{
+BL_CARGO blc;
+RHDL rh;
+OMDB1 om(true);
+for (blc.number=0; bkysrch(bl_btr,BK_GT,&rh,&blc) && blc.number<90; )
+	{
+	DRVDET dd;
+	memset(&dd,0,sizeof(DRVDET));
+	dd.number=blc.number;
+	dd.drive_free_space=blc.drive_free_space;
+	dd.rim[0].rating=100; dd.rim[0].imno=BIGLONG;	// Initial "extreme" values to overwrite by lowest key
+	int recsz;
+	IMSZ *im=(IMSZ*)zrecmem(db,rh,&recsz);
+	int i,ct=recsz/sizeof(IMSZ);
+	for (i=0;i<ct;i++)
+		{
+		OM1_KEY omk;
+		if (!om.get_om1(im[i].imno,&omk)) m_finish("Imno:%d not found",im[i].imno);
+		if (omk.rating<dd.rim[0].rating || (omk.rating==dd.rim[0].rating && omk.imno<dd.rim[0].imno))
+			{dd.rim[0].rating=omk.rating; dd.rim[0].imno=omk.imno;}
+		if (omk.rating>dd.rim[1].rating || (omk.rating==dd.rim[1].rating && omk.imno>dd.rim[1].imno))
+			{dd.rim[1].rating=omk.rating; dd.rim[1].imno=omk.imno;}
+		}
+	tbl_drvdet->put(&dd);
+	memtake(im);
+	}
+}
+
 bool MVDB::upd_if_changed(BL_CARGO *blc, DYNTBL *tbl_imsz)
 {
 void *data=tbl_imsz->get(0);
@@ -123,12 +155,3 @@ bool ok=bkydel(bl_btr,&rh,&blc);
 if (!ok) m_finish("del error");
 recdel(db,rh);
 }
-
-MVDB::~MVDB()
-{
-dbsafeclose(db);
-}
-
-
-//char *mvdb_number2path(char *pth, int number, int mnt)          // gives fully-qualified path to FilmsNN (in media or mnt)
-//{return(strfmt(pth,"%s/Films%02d",drv_prefix[mnt],number));}
